@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plateforme de Navigation Autonome de Robots</title>
+    <title>Contrôle TurtleBot3</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.1.0/roslib.min.js"></script>
     <style>
         :root {
             --primary-gradient: linear-gradient(135deg, #2563eb, #1e40af);
@@ -14,7 +15,7 @@
             --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
-        
+
         * {
             margin: 0;
             padding: 0;
@@ -24,253 +25,204 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
-            color: var(--text-color);
             background-color: #f0f4f8;
+            color: var(--text-color);
+        }
+
+        .nav-menu {
+            background: var(--primary-gradient);
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
         }
 
         .header {
             background: var(--primary-gradient);
             color: white;
-            padding: 4rem 1rem;
+            padding: 2rem 1rem;
             text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('/api/placeholder/1200/400') center/cover;
-            opacity: 0.1;
-            z-index: 0;
-        }
-
-        .header-content {
-            position: relative;
-            z-index: 1;
         }
 
         .header h1 {
-            font-size: 3rem;
+            font-size: 2.5rem;
             margin-bottom: 1rem;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
         }
 
         .header p {
             font-size: 1.2rem;
-            max-width: 600px;
-            margin: 0 auto;
             opacity: 0.9;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 4rem 1rem;
-        }
-
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 2rem;
-            margin-top: 3rem;
-        }
-
-        .feature-card {
-            background: white;
+        .control-container {
+            max-width: 800px;
+            margin: 2rem auto;
             padding: 2rem;
-            border-radius: 16px;
-            text-align: center;
-            box-shadow: var(--card-shadow);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .feature-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: var(--secondary-gradient);
-        }
-
-        .feature-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--hover-shadow);
-        }
-
-        .feature-card i {
-            font-size: 3rem;
-            background: var(--secondary-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 1.5rem;
-        }
-
-        .feature-card h3 {
-            margin-bottom: 1rem;
-            color: #1a365d;
-            font-size: 1.5rem;
-        }
-
-        .feature-card p {
-            color: #4a5568;
-            line-height: 1.7;
-        }
-
-        .tech-stack {
-            margin-top: 6rem;
-            text-align: center;
-            padding: 3rem;
             background: white;
             border-radius: 16px;
             box-shadow: var(--card-shadow);
         }
 
-        .tech-stack h2 {
-            color: #1a365d;
-            font-size: 2rem;
-            margin-bottom: 2rem;
-            position: relative;
-            display: inline-block;
-        }
-
-        .tech-stack h2::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 60px;
-            height: 4px;
-            background: var(--secondary-gradient);
-            border-radius: 2px;
-        }
-
-        .tech-list {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 2rem;
-            margin-top: 3rem;
-        }
-
-        .tech-item {
-            background: var(--light-bg);
-            padding: 1rem 2rem;
+        .status {
+            padding: 1rem;
+            margin: 1rem 0;
             border-radius: 8px;
-            box-shadow: var(--card-shadow);
+            text-align: center;
+            font-weight: bold;
+            background-color: #f87171;
+            color: #7f1d1d;
             transition: all 0.3s ease;
-            border: 1px solid #e2e8f0;
         }
 
-        .tech-item:hover {
+        .connected {
+            background-color: #4ade80;
+            color: #064e3b;
+        }
+
+        .controls {
+            margin: 2rem auto;
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        button {
+            padding: 1rem;
+            font-size: 1.2rem;
+            cursor: pointer;
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
             transform: translateY(-2px);
             box-shadow: var(--hover-shadow);
-            background: white;
+        }
+
+        button:active {
+            transform: translateY(0);
         }
 
         @media (max-width: 768px) {
             .header h1 {
-                font-size: 2.5rem;
+                font-size: 2rem;
             }
             
-            .features {
-                grid-template-columns: 1fr;
+            .control-container {
+                margin: 1rem;
+                padding: 1rem;
             }
             
-            .tech-list {
-                gap: 1rem;
+            .controls {
+                gap: 0.5rem;
             }
-            
-            .tech-item {
-                padding: 0.75rem 1.5rem;
-            }
-        }
-
-        .highlight {
-            position: relative;
-            display: inline-block;
-        }
-
-        .highlight::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: var(--secondary-gradient);
-            transform: scaleX(0);
-            transform-origin: right;
-            transition: transform 0.3s ease;
-        }
-
-        .highlight:hover::after {
-            transform: scaleX(1);
-            transform-origin: left;
         }
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="header-content">
-            <h1>Plateforme de Navigation Autonome de Robots</h1>
-            <p>Une solution innovante combinant robotique avancée et intelligence artificielle pour une navigation autonome précise et fiable</p>
+    <nav class="nav-menu">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <a href="index.html" style="color: white; text-decoration: none;">
+                    <i class="fas fa-robot"></i> TurtleBot3
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Accueil</a>
+                <a href="controle.html">Contrôle</a>
+            </div>
         </div>
+    </nav>
+
+    <header class="header">
+        <h1>Contrôle TurtleBot3</h1>
+        <p>Interface de contrôle pour TurtleBot3 via ROS Noetic</p>
     </header>
 
-    <main class="container">
-        <section class="features">
-            <div class="feature-card">
-                <i class="fas fa-robot"></i>
-                <h3>Contrôle à Distance</h3>
-                <p>Interface web intuitive pour piloter vos robots mobiles à roues différentielles. Contrôle précis et retour en temps réel pour une expérience utilisateur optimale.</p>
-            </div>
+    <div class="control-container">
+        <div id="status" class="status">Déconnecté</div>
 
-            <div class="feature-card">
-                <i class="fas fa-map-marked-alt"></i>
-                <h3>Cartographie Intelligente</h3>
-                <p>Génération automatique de cartes détaillées de l'environnement avec planification optimisée des trajectoires. Navigation autonome sécurisée et efficace.</p>
-            </div>
+        <div class="controls">
+            <button onclick="publishVelocity(0, 0)"></button>
+            <button onclick="publishVelocity(0.2, 0)">↑</button>
+            <button onclick="publishVelocity(0, 0)"></button>
+            
+            <button onclick="publishVelocity(0, 0.5)">←</button>
+            <button onclick="publishVelocity(0, 0)">■</button>
+            <button onclick="publishVelocity(0, -0.5)">→</button>
+            
+            <button onclick="publishVelocity(0, 0)"></button>
+            <button onclick="publishVelocity(-0.2, 0)">↓</button>
+            <button onclick="publishVelocity(0, 0)"></button>
+        </div>
+    </div>
 
-            <div class="feature-card">
-                <i class="fas fa-video"></i>
-                <h3>Vision Augmentée</h3>
-                <p>Flux vidéo HD en temps réel avec détection avancée de balises et reconnaissance d'objets. Système de notification intelligent pour une supervision optimale.</p>
-            </div>
-        </section>
+    <script>
+        var ros = new ROSLIB.Ros({
+            url: 'ws://localhost:9090'
+        });
 
-        <section class="tech-stack">
-            <h2>Technologies de Pointe</h2>
-            <div class="tech-list">
-                <div class="tech-item">
-                    <span class="highlight">TurtleBot 4</span>
-                </div>
-                <div class="tech-item">
-                    <span class="highlight">ROS2</span>
-                </div>
-                <div class="tech-item">
-                    <span class="highlight">Gazebo</span>
-                </div>
-                <div class="tech-item">
-                    <span class="highlight">Python</span>
-                </div>
-                <div class="tech-item">
-                    <span class="highlight">C++</span>
-                </div>
-                <div class="tech-item">
-                    <span class="highlight">Raspberry Pi 4</span>
-                </div>
-            </div>
-        </section>
-    </main>
+        ros.on('connection', function() {
+            console.log('Connecté');
+            document.getElementById('status').textContent = 'Connecté';
+            document.getElementById('status').classList.add('connected');
+        });
+
+        ros.on('error', function(error) {
+            console.log('Erreur:', error);
+            document.getElementById('status').textContent = 'Erreur de connexion';
+            document.getElementById('status').classList.remove('connected');
+        });
+
+        ros.on('close', function() {
+            console.log('Déconnecté');
+            document.getElementById('status').textContent = 'Déconnecté';
+            document.getElementById('status').classList.remove('connected');
+        });
+
+        var cmdVel = new ROSLIB.Topic({
+            ros: ros,
+            name: '/cmd_vel',
+            messageType: 'geometry_msgs/Twist'
+        });
+
+        function publishVelocity(linear, angular) {
+            var twist = new ROSLIB.Message({
+                linear: { x: linear, y: 0, z: 0 },
+                angular: { x: 0, y: 0, z: angular }
+            });
+            cmdVel.publish(twist);
+            console.log('Vitesse publiée:', linear, angular);
+        }
+    </script>
 </body>
 </html>
