@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="fr">
+<!-- [Le HEAD avec les styles reste identique jusqu'à la partie script] -->
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exploration Autonome TurtleBot3</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.1.0/roslib.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #2563eb, #1e40af);
+            --secondary-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
+            --text-color: #1f2937;
+            --light-bg: #f8fafc;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            background-color: #f0f4f8;
+            color: var(--text-color);
+        }
+
+        .nav-menu {
+            background: var(--primary-gradient);
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+
+        .header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 2rem 1rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .exploration-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 2rem;
+        }
+
+        .map-view {
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            padding: 1rem;
+            min-height: 600px;
+        }
+
+        .controls-panel {
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+        }
+
+        .status {
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            background-color: #f87171;
+            color: #7f1d1d;
+            transition: all 0.3s ease;
+        }
+
+        .connected {
+            background-color: #4ade80;
+            color: #064e3b;
+        }
+
+        .control-button {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary-gradient);
+            color: white;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .control-button:active {
+            transform: translateY(0);
+        }
+
+        .disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .debug-info {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--light-bg);
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .map-canvas {
+            width: 100%;
+            height: 600px;
+            background: #eee;
+            border-radius: 8px;
+        }
+
+        .stats-panel {
+            margin: 1rem 0;
+            padding: 1rem;
+            background: var(--light-bg);
+            border-radius: 8px;
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        @media (max-width: 1024px) {
+            .exploration-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .map-view {
+                min-height: 400px;
+            }
+            
+            .map-canvas {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-menu">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <a href="index.html" style="color: white; text-decoration: none;">
+                    <i class="fas fa-robot"></i> TurtleBot3
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Accueil</a>
+                <a href="controle.html">Contrôle</a>
+                <a href="cartographie.html">Cartographie</a>
+                <a href="navigation.html">Navigation</a>
+                <a href="exploration.html">Exploration</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="header">
+        <h1>Exploration Autonome TurtleBot3</h1>
+        <p>Cartographie automatique de l'environnement</p>
+    </header>
+
+    <div class="exploration-container">
+        <div class="map-view">
+            <canvas id="mapCanvas" class="map-canvas"></canvas>
+        </div>
+
+        <div class="controls-panel">
+            <div id="status" class="status">Déconnecté</div>
+            
+            <button id="startExploration" class="control-button">
+                <i class="fas fa-play"></i> Démarrer l'exploration
+            </button>
+            
+            <button id="pauseExploration" class="control-button" disabled>
+                <i class="fas fa-pause"></i> Pause
+            </button>
+            
+            <button id="stopExploration" class="control-button" disabled>
+                <i class="fas fa-stop"></i> Arrêter
+            </button>
+
+            <button id="saveMap" class="control-button" disabled>
+                <i class="fas fa-save"></i> Sauvegarder la carte
+            </button>
+
+            <div class="stats-panel">
+                <div class="stats-item">
+                    <span>Surface explorée:</span>
+                    <span id="exploredArea">0%</span>
+                </div>
+                <div class="stats-item">
+                    <span>Temps écoulé:</span>
+                    <span id="elapsedTime">00:00:00</span>
+                </div>
+                <div class="stats-item">
+                    <span>État batterie:</span>
+                    <span id="batteryLevel">N/A</span>
+                </div>
+            </div>
+
+            <div class="debug-info" id="debug-log">
+                Logs d'exploration...
+            </div>
+        </div>
+    </div>
+
+
+<script>
+    function addDebugLog(message) {
+        const debugLog = document.getElementById('debug-log');
+        const timestamp = new Date().toLocaleTimeString();
+        debugLog.innerHTML = `[${timestamp}] ${message}<br>` + debugLog.innerHTML;
+    }
+
+    // Connexion à ROS
+    function connectToROS() {
+        var ros = new ROSLIB.Ros({
+            url: 'ws://localhost:9090'
+        });
+
+        ros.on('connection', function() {
+            console.log('Connecté à ROS');
+            addDebugLog('Connecté à ROS');
+            document.getElementById('status').textContent = 'Connecté';
+            document.getElementById('status').classList.add('connected');
+            setupSubscribers();
+        });
+
+        ros.on('error', function(error) {
+            console.log('Erreur de connexion:', error);
+            addDebugLog('Erreur de connexion, nouvelle tentative dans 3s...');
+            document.getElementById('status').textContent = 'Erreur de connexion';
+            document.getElementById('status').classList.remove('connected');
+            setTimeout(connectToROS, 3000);
+        });
+
+        ros.on('close', function() {
+            console.log('Connexion fermée');
+            addDebugLog('Connexion fermée, nouvelle tentative dans 3s...');
+            document.getElementById('status').textContent = 'Déconnecté';
+            document.getElementById('status').classList.remove('connected');
+            setTimeout(connectToROS, 3000);
+        });
+
+        return ros;
+    }
+
+    const ros = connectToROS();
+    const canvas = document.getElementById('mapCanvas');
+    const ctx = canvas.getContext('2d');
+    let explorationTimer = null;
+    let startTime = null;
+    let isExploring = false;
+
+    // Redimensionnement du canvas
+    function resizeCanvas() {
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Configuration des subscribers
+    function setupSubscribers() {
+        // Souscription à la carte
+        var mapListener = new ROSLIB.Topic({
+            ros: ros,
+            name: '/map',
+            messageType: 'nav_msgs/OccupancyGrid'
+        });
+
+        mapListener.subscribe(function(message) {
+            console.log('Carte reçue');
+            addDebugLog('Mise à jour de la carte');
+            drawMap(message);
+            updateExploredArea(message);
+        });
+
+        // Souscription à la position du robot
+        var poseListener = new ROSLIB.Topic({
+            ros: ros,
+            name: '/robot_pose',
+            messageType: 'geometry_msgs/Pose'
+        });
+
+        poseListener.subscribe(function(message) {
+            updateRobotPosition(message);
+        });
+
+        // Souscription aux frontières d'exploration
+        var frontierListener = new ROSLIB.Topic({
+            ros: ros,
+            name: '/explore/frontiers',
+            messageType: 'visualization_msgs/MarkerArray'
+        });
+
+        frontierListener.subscribe(function(message) {
+            addDebugLog(`Nouvelles frontières détectées: ${message.markers.length}`);
+        });
+    }
+
+    // Dessin de la carte
+    function drawMap(mapData) {
+        const imageData = ctx.createImageData(mapData.info.width, mapData.info.height);
+        const data = imageData.data;
+        const resolution = mapData.info.resolution;
+        const mapWidth = mapData.info.width;
+        const mapHeight = mapData.info.height;
+
+        // Calcul du facteur d'échelle pour adapter la carte au canvas
+        const scaleX = canvas.width / (mapWidth * resolution);
+        const scaleY = canvas.height / (mapHeight * resolution);
+        const scale = Math.min(scaleX, scaleY);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Translation pour centrer la carte
+        ctx.save();
+        ctx.translate(
+            (canvas.width - mapWidth * scale) / 2,
+            (canvas.height - mapHeight * scale) / 2
+        );
+        ctx.scale(scale, scale);
+
+        for (let i = 0; i < mapData.data.length; i++) {
+            const x = i % mapWidth;
+            const y = Math.floor(i / mapWidth);
+            const val = mapData.data[i];
+
+            if (val === -1) { // Inconnu
+                ctx.fillStyle = '#808080';
+            } else if (val === 100) { // Occupé
+                ctx.fillStyle = '#000000';
+            } else { // Libre
+                ctx.fillStyle = '#FFFFFF';
+            }
+
+            ctx.fillRect(x, y, 1, 1);
+        }
+
+        ctx.restore();
+    }
+
+    // Mise à jour de la position du robot
+    function updateRobotPosition(pose) {
+        drawMap(); // Redessiner la carte
+        
+        // Position du robot
+        const resolution = 0.05; // Résolution de la carte (à ajuster selon votre configuration)
+        const robotX = pose.position.x / resolution;
+        const robotY = pose.position.y / resolution;
+
+        ctx.save();
+        // Dessiner le robot
+        ctx.beginPath();
+        ctx.arc(robotX, robotY, 3, 0, 2 * Math.PI);
+        ctx.fillStyle = '#FF0000';
+        ctx.fill();
+
+        // Direction du robot
+        const angle = 2 * Math.atan2(pose.orientation.z, pose.orientation.w);
+        ctx.beginPath();
+        ctx.moveTo(robotX, robotY);
+        ctx.lineTo(
+            robotX + Math.cos(angle) * 6,
+            robotY + Math.sin(angle) * 6
+        );
+        ctx.strokeStyle = '#FF0000';
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // Calcul de la zone explorée
+    function updateExploredArea(mapData) {
+        const total = mapData.data.length;
+        const explored = mapData.data.filter(cell => cell !== -1).length;
+        const percentage = Math.round((explored / total) * 100);
+        document.getElementById('exploredArea').textContent = `${percentage}%`;
+    }
+
+    // Mise à jour du timer
+    function updateTimer() {
+        if (!startTime) return;
+        const now = new Date();
+        const diff = now - startTime;
+        const hours = Math.floor(diff / 3600000);
+        const minutes = Math.floor((diff % 3600000) / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        document.getElementById('elapsedTime').textContent = 
+            `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    // Contrôle de l'exploration avec explore_lite
+    document.getElementById('startExploration').addEventListener('click', async function() {
+        if (!isExploring) {
+            try {
+                // Activer explore_lite via un service ROS
+                const exploreClient = new ROSLIB.Service({
+                    ros: ros,
+                    name: '/explore/resume',  // Service d'explore_lite
+                    serviceType: 'std_srvs/Trigger'
+                });
+
+                const request = new ROSLIB.ServiceRequest({});
+
+                exploreClient.callService(request, function(result) {
+                    if (result.success) {
+                        isExploring = true;
+                        startTime = new Date();
+                        explorationTimer = setInterval(updateTimer, 1000);
+                        
+                        addDebugLog('Exploration autonome démarrée');
+                        document.getElementById('startExploration').disabled = true;
+                        document.getElementById('stopExploration').disabled = false;
+                        document.getElementById('saveMap').disabled = true;
+                    } else {
+                        addDebugLog('Erreur: ' + result.message);
+                    }
+                });
+            } catch (error) {
+                addDebugLog('Erreur lors du démarrage de l\'exploration: ' + error);
+            }
+        }
+    });
+
+    document.getElementById('stopExploration').addEventListener('click', async function() {
+        if (isExploring) {
+            try {
+                // Arrêter explore_lite
+                const exploreClient = new ROSLIB.Service({
+                    ros: ros,
+                    name: '/explore/pause',  // Service d'explore_lite
+                    serviceType: 'std_srvs/Trigger'
+                });
+
+                const request = new ROSLIB.ServiceRequest({});
+
+                exploreClient.callService(request, function(result) {
+                    if (result.success) {
+                        isExploring = false;
+                        clearInterval(explorationTimer);
+                        
+                        addDebugLog('Exploration arrêtée');
+                        document.getElementById('startExploration').disabled = false;
+                        document.getElementById('stopExploration').disabled = true;
+                        document.getElementById('saveMap').disabled = false;
+                        
+                        stopRobot();
+                    } else {
+                        addDebugLog('Erreur: ' + result.message);
+                    }
+                });
+            } catch (error) {
+                addDebugLog('Erreur lors de l\'arrêt de l\'exploration: ' + error);
+            }
+        }
+    });
+
+    document.getElementById('saveMap').addEventListener('click', async function() {
+        try {
+            const saveMapClient = new ROSLIB.Service({
+                ros: ros,
+                name: '/slam_toolbox/save_map',  // Service de slam_toolbox
+                serviceType: 'std_srvs/Trigger'
+            });
+
+            const request = new ROSLIB.ServiceRequest({});
+
+            saveMapClient.callService(request, function(result) {
+                if (result.success) {
+                    addDebugLog('Carte sauvegardée avec succès');
+                } else {
+                    addDebugLog('Erreur lors de la sauvegarde: ' + result.message);
+                }
+            });
+        } catch (error) {
+            addDebugLog('Erreur lors de la sauvegarde de la carte: ' + error);
+        }
+    });
+
+    function stopRobot() {
+        const cmdVel = new ROSLIB.Topic({
+            ros: ros,
+            name: '/cmd_vel',
+            messageType: 'geometry_msgs/Twist'
+        });
+
+        const twist = new ROSLIB.Message({
+            linear: { x: 0, y: 0, z: 0 },
+            angular: { x: 0, y: 0, z: 0 }
+        });
+
+        cmdVel.publish(twist);
+        addDebugLog('Robot arrêté');
+    }
+</script>
+</body>
+</html>
