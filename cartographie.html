@@ -149,23 +149,22 @@
             cursor: not-allowed;
         }
 
-        .map-info {
+        .debug-info {
             margin-top: 1rem;
             padding: 1rem;
             background: var(--light-bg);
             border-radius: 8px;
-        }
-
-        .map-info h3 {
-            margin-bottom: 0.5rem;
-            color: #1a365d;
+            font-family: monospace;
+            font-size: 0.9rem;
+            max-height: 200px;
+            overflow-y: auto;
         }
 
         #map {
             width: 100%;
             height: 600px;
-            border-radius: 8px;
             background: #eee;
+            border-radius: 8px;
         }
 
         @media (max-width: 1024px) {
@@ -216,15 +215,19 @@
                 <i class="fas fa-save"></i> Sauvegarder la carte
             </button>
 
-            <div class="map-info">
-                <h3>Informations</h3>
-                <p id="mapStatus">État: En attente</p>
-                <p id="robotPosition">Position: -</p>
+            <div class="debug-info">
+                <div id="debug-log">Logs de débogage...</div>
             </div>
         </div>
     </div>
 
     <script>
+        function addDebugLog(message) {
+            const debugLog = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.innerHTML = `[${timestamp}] ${message}<br>` + debugLog.innerHTML;
+        }
+
         // Connexion à ROS
         var ros = new ROSLIB.Ros({
             url: 'ws://localhost:9090'
@@ -232,18 +235,21 @@
 
         ros.on('connection', function() {
             console.log('Connecté à ROS');
+            addDebugLog('Connecté à ROS');
             document.getElementById('status').textContent = 'Connecté';
             document.getElementById('status').classList.add('connected');
         });
 
         ros.on('error', function(error) {
             console.log('Erreur de connexion:', error);
+            addDebugLog('Erreur de connexion: ' + error);
             document.getElementById('status').textContent = 'Erreur de connexion';
             document.getElementById('status').classList.remove('connected');
         });
 
         ros.on('close', function() {
             console.log('Connexion fermée');
+            addDebugLog('Connexion fermée');
             document.getElementById('status').textContent = 'Déconnecté';
             document.getElementById('status').classList.remove('connected');
         });
@@ -252,24 +258,43 @@
         var viewer = new ROS2D.Viewer({
             divID: 'map',
             width: document.getElementById('map').offsetWidth,
-            height: 600
+            height: 600,
+            background: '#f8f9fa'
         });
 
-        // Ajout de la grille de la carte
+        // Création du client pour la grille d'occupation
         var gridClient = new ROS2D.OccupancyGridClient({
             ros: ros,
             rootObject: viewer.scene,
             continuous: true,
-            topic: '/map'  // Assurez-vous que c'est le bon topic
+            topic: '/map',
+            topicQueue: 1,
+            compression: 'none'
         });
 
-        // Mise à l'échelle de la carte
+        // Gestion des événements de la carte
         gridClient.on('change', function() {
+            console.log('Nouvelle carte reçue');
+            addDebugLog('Nouvelle carte reçue');
             viewer.scaleToDimensions(gridClient.currentGrid.width, gridClient.currentGrid.height);
             viewer.shift(gridClient.currentGrid.pose.position.x, gridClient.currentGrid.pose.position.y);
         });
 
-        // Fonctions de contrôle du SLAM
+        // Écoute directe du topic de la carte
+        var mapListener = new ROSLIB.Topic({
+            ros: ros,
+            name: '/map',
+            messageType: 'nav_msgs/OccupancyGrid'
+        });
+
+        mapListener.subscribe(function(message) {
+            console.log('Message de carte reçu:', 
+                'width:', message.info.width,
+                'height:', message.info.height);
+            addDebugLog(`Carte: ${message.info.width}x${message.info.height}`);
+        });
+
+        // Gestion des boutons
         document.getElementById('startMapping').addEventListener('click', function() {
             var startSlam = new ROSLIB.Service({
                 ros: ros,
@@ -279,7 +304,7 @@
 
             var request = new ROSLIB.ServiceRequest({});
             startSlam.callService(request, function(result) {
-                document.getElementById('mapStatus').textContent = 'État: SLAM actif';
+                addDebugLog('SLAM démarré');
             });
         });
 
@@ -292,7 +317,7 @@
 
             var request = new ROSLIB.ServiceRequest({});
             stopSlam.callService(request, function(result) {
-                document.getElementById('mapStatus').textContent = 'État: SLAM arrêté';
+                addDebugLog('SLAM arrêté');
             });
         });
 
@@ -310,21 +335,9 @@
             });
 
             saveMap.callService(request, function(result) {
+                addDebugLog('Carte sauvegardée');
                 alert('Carte sauvegardée avec succès!');
             });
-        });
-
-        // Suivi de la position du robot
-        var robotPose = new ROSLIB.Topic({
-            ros: ros,
-            name: '/robot_pose',
-            messageType: 'geometry_msgs/Pose'
-        });
-
-        robotPose.subscribe(function(message) {
-            var x = message.position.x.toFixed(2);
-            var y = message.position.y.toFixed(2);
-            document.getElementById('robotPosition').textContent = `Position: x=${x}, y=${y}`;
         });
     </script>
 </body>
