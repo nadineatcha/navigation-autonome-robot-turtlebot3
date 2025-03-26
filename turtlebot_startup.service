@@ -1,0 +1,14 @@
+#cat /etc/systemd/system/turtlebot_startup.service
+
+[Unit]
+Description=Démarrage automatique du Turtlebot3
+After=network.target
+
+[Service]
+ExecStart=/home/ubuntu/en_lancer_robot_sur_turtlebot.sh
+Restart=always
+User=ubuntu
+Type=simple
+
+[Install]
+WantedBy=multi-user.target
