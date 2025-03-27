@@ -1,4 +1,4 @@
-# Script pour le PC distant 
+#cat en_lancer_robot_sur_pc_distant.sh 
 #!/bin/bash
 
 # Fonction pour afficher un séparateur
@@ -10,6 +10,17 @@ show_separator() {
 
 echo "🖥️  Démarrage des processus sur le PC distant..."
 echo -e "----------------------------------------\n"
+
+# Demander l'adresse IP du Turtlebot3 à l'utilisateur
+echo -n "📡 Veuillez entrer l'adresse IP du Turtlebot3 : "
+read turtlebot_ip
+
+# Configurer la variable d'environnement ROS_MASTER_URI avec l'IP saisie
+export ROS_MASTER_URI="http://$turtlebot_ip:11311"
+echo "🔧 ROS_MASTER_URI configuré à : $ROS_MASTER_URI"
+
+# Charger l'environnement ROS (nécessaire pour les commandes ROS)
+source /opt/ros/noetic/setup.bash  # Remplacez "noetic" par votre version de ROS
 
 # Lancement du pont websocket
 echo "🌐 Lancement du pont websocket..."
