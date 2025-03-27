@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services TurtleBot3</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.1.0/roslib.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #2563eb, #1e40af);
+            --secondary-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
+            --text-color: #1f2937;
+            --light-bg: #f8fafc;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --success-bg: #d1fae5;
+            --success-text: #065f46;
+            --error-bg: #fee2e2;
+            --error-text: #b91c1c;
+            --warning-bg: #fffbeb;
+            --warning-text: #92400e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            background-color: #f0f4f8;
+            color: var(--text-color);
+        }
+
+        .nav-menu {
+            background: var(--primary-gradient);
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+
+        .header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 2rem 1rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .services-grid {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .service-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .service-header {
+            padding: 1.5rem;
+            background: var(--secondary-gradient);
+            color: white;
+        }
+
+        .service-header h2 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .service-body {
+            padding: 1.5rem;
+        }
+
+        .service-status {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .status-offline {
+            background-color: var(--error-bg);
+            color: var(--error-text);
+        }
+
+        .status-online {
+            background-color: var(--success-bg);
+            color: var(--success-text);
+        }
+
+        .status-partial {
+            background-color: var(--warning-bg);
+            color: var(--warning-text);
+        }
+
+        .service-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .action-btn {
+            padding: 1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .start-btn {
+            background-color: #10b981;
+            color: white;
+        }
+
+        .start-btn:hover {
+            background-color: #059669;
+        }
+
+        .stop-btn {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .stop-btn:hover {
+            background-color: #dc2626;
+        }
+
+        .restart-btn {
+            background-color: #f59e0b;
+            color: white;
+        }
+
+        .restart-btn:hover {
+            background-color: #d97706;
+        }
+
+        .logs-container {
+            margin-top: 1.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 1rem;
+            background-color: #f1f5f9;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .log-item {
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .log-timestamp {
+            font-weight: bold;
+            color: #64748b;
+        }
+
+        .log-success {
+            color: var(--success-text);
+        }
+
+        .log-error {
+            color: var(--error-text);
+        }
+
+        .log-info {
+            color: #1e40af;
+        }
+
+        @media (max-width: 768px) {
+            .services-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-menu">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <a href="index.html" style="color: white; text-decoration: none;">
+                    <i class="fas fa-robot"></i> TurtleBot3
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Accueil</a>
+                <a href="controle.html">Contrôle</a>
+                <a href="cartographie.html">Cartographie</a>
+                <a href="navigation.html">Navigation</a>
+                <a href="services.html">Services</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="header">
+        <h1>Gestion des Services TurtleBot3</h1>
+        <p>Démarrage, arrêt et surveillance des services ROS</p>
+    </header>
+
+    <div class="services-grid">
+        <!-- Carte pour le service ROS principal -->
+        <div class="service-card">
+            <div class="service-header">
+                <h2><i class="fas fa-server"></i> ROS Core</h2>
+                <p>Service principal ROS</p>
+            </div>
+            <div class="service-body">
+                <div id="roscore-status" class="service-status status-offline">
+                    Status: Hors ligne
+                </div>
+                <div class="service-actions">
+                    <button id="start-roscore" class="action-btn start-btn">
+                        <i class="fas fa-play"></i> Démarrer
+                    </button>
+                    <button id="stop-roscore" class="action-btn stop-btn">
+                        <i class="fas fa-stop"></i> Arrêter
+                    </button>
+                </div>
+                <div class="logs-container" id="roscore-logs">
+                    <div class="log-item">
+                        <span class="log-timestamp">[--:--:--]</span>
+                        <span class="log-info">En attente d'actions...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Carte pour le service Bringup -->
+        <div class="service-card">
+            <div class="service-header">
+                <h2><i class="fas fa-robot"></i> TurtleBot3 Bringup</h2>
+                <p>Initialisation du robot</p>
+            </div>
+            <div class="service-body">
+                <div id="bringup-status" class="service-status status-offline">
+                    Status: Hors ligne
+                </div>
+                <div class="service-actions">
+                    <button id="start-bringup" class="action-btn start-btn">
+                        <i class="fas fa-play"></i> Démarrer
+                    </button>
+                    <button id="stop-bringup" class="action-btn stop-btn">
+                        <i class="fas fa-stop"></i> Arrêter
+                    </button>
+                </div>
+                <div class="logs-container" id="bringup-logs">
+                    <div class="log-item">
+                        <span class="log-timestamp">[--:--:--]</span>
+                        <span class="log-info">En attente d'actions...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Carte pour le service WebSocket -->
+        <div class="service-card">
+            <div class="service-header">
+                <h2><i class="fas fa-network-wired"></i> ROS Bridge</h2>
+                <p>Communication WebSocket</p>
+            </div>
+            <div class="service-body">
+                <div id="bridge-status" class="service-status status-offline">
+                    Status: Hors ligne
+                </div>
+                <div class="service-actions">
+                    <button id="start-bridge" class="action-btn start-btn">
+                        <i class="fas fa-play"></i> Démarrer
+                    </button>
+                    <button id="stop-bridge" class="action-btn stop-btn">
+                        <i class="fas fa-stop"></i> Arrêter
+                    </button>
+                </div>
+                <div class="logs-container" id="bridge-logs">
+                    <div class="log-item">
+                        <span class="log-timestamp">[--:--:--]</span>
+                        <span class="log-info">En attente d'actions...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Carte pour le service SLAM -->
+        <div class="service-card">
+            <div class="service-header">
+                <h2><i class="fas fa-map-marked-alt"></i> SLAM</h2>
+                <p>Cartographie simultanée</p>
+            </div>
+            <div class="service-body">
+                <div id="slam-status" class="service-status status-offline">
+                    Status: Hors ligne
+                </div>
+                <div class="service-actions">
+                    <button id="start-slam" class="action-btn start-btn">
+                        <i class="fas fa-play"></i> Démarrer
+                    </button>
+                    <button id="stop-slam" class="action-btn stop-btn">
+                        <i class="fas fa-stop"></i> Arrêter
+                    </button>
+                </div>
+                <div class="logs-container" id="slam-logs">
+                    <div class="log-item">
+                        <span class="log-timestamp">[--:--:--]</span>
+                        <span class="log-info">En attente d'actions...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Fonction pour ajouter un log
+        function addLog(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const timestamp = new Date().toLocaleTimeString();
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+
+            logItem.innerHTML = `
+                <span class="log-timestamp">[${timestamp}]</span>
+                <span class="log-${type}">${message}</span>
+            `;
+
+            container.prepend(logItem);
+            
+            // Limiter à 20 entrées de log
+            const logs = container.querySelectorAll('.log-item');
+            if (logs.length > 20) {
+                for (let i = 20; i < logs.length; i++) {
+                    container.removeChild(logs[i]);
+                }
+            }
+        }
+
+        // Fonction de connexion à ROS
+        let ros = null;
+        let connected = false;
+
+        function connectToROS() {
+            if (ros) return; // Déjà connecté ou en cours de connexion
+
+            ros = new ROSLIB.Ros({
+                url: 'ws://localhost:9090'
+            });
+
+            ros.on('connection', function() {
+                console.log('Connecté à ROS');
+                connected = true;
+                checkServices();
+            });
+
+            ros.on('error', function(error) {
+                console.log('Erreur de connexion ROS:', error);
+                connected = false;
+                setTimeout(connectToROS, 3000);
+            });
+
+            ros.on('close', function() {
+                console.log('Connexion ROS fermée');
+                connected = false;
+                ros = null;
+                setTimeout(connectToROS, 3000);
+            });
+        }
+
+        // Vérifier l'état des services
+        function checkServices() {
+            if (!connected) return;
+
+            // Service pour vérifier l'état de ROS Core
+            const checkRoscore = new ROSLIB.Service({
+                ros: ros,
+                name: '/check_service',
+                serviceType: 'std_srvs/Trigger'
+            });
+
+            // Vérifier roscore
+            const roscoreRequest = new ROSLIB.ServiceRequest({
+                service_name: 'roscore'
+            });
+
+            checkRoscore.callService(roscoreRequest, function(result) {
+                const status = document.getElementById('roscore-status');
+                if (result.success) {
+                    status.textContent = 'Status: En ligne';
+                    status.className = 'service-status status-online';
+                } else {
+                    status.textContent = 'Status: Hors ligne';
+                    status.className = 'service-status status-offline';
+                }
+            });
+
+            // Vérifier les autres services de la même manière
+            // ...
+        }
+
+        // Gestion des boutons
+        document.getElementById('start-roscore').addEventListener('click', function() {
+            if (!connected) {
+                addLog('roscore-logs', 'Pas de connexion à ROS Bridge', 'error');
+                return;
+            }
+
+            const startService = new ROSLIB.Service({
+                ros: ros,
+                name: '/start_service',
+                serviceType: 'std_srvs/Trigger'
+            });
+
+            const request = new ROSLIB.ServiceRequest({
+                service_name: 'roscore'
+            });
+
+            addLog('roscore-logs', 'Demande de démarrage de roscore...', 'info');
+
+            startService.callService(request, function(result) {
+                if (result.success) {
+                    addLog('roscore-logs', 'Roscore démarré avec succès', 'success');
+                    checkServices();
+                } else {
+                    addLog('roscore-logs', `Erreur: ${result.message}`, 'error');
+                }
+            });
+        });
+
+        document.getElementById('stop-roscore').addEventListener('click', function() {
+            if (!connected) {
+                addLog('roscore-logs', 'Pas de connexion à ROS Bridge', 'error');
+                return;
+            }
+
+            const stopService = new ROSLIB.Service({
+                ros: ros,
+                name: '/stop_service',
+                serviceType: 'std_srvs/Trigger'
+            });
+
+            const request = new ROSLIB.ServiceRequest({
+                service_name: 'roscore'
+            });
+
+            addLog('roscore-logs', 'Demande d\'arrêt de roscore...', 'info');
+
+            stopService.callService(request, function(result) {
+                if (result.success) {
+                    addLog('roscore-logs', 'Roscore arrêté avec succès', 'success');
+                    checkServices();
+                } else {
+                    addLog('roscore-logs', `Erreur: ${result.message}`, 'error');
+                }
+            });
+        });
+
+        // Répétez pour les autres boutons
+        // ...
+
+        // Initialisation
+        window.addEventListener('load', function() {
+            connectToROS();
+            
+            // Vérifier périodiquement l'état des services
+            setInterval(checkServices, 10000);
+        });
+    </script>
+</body>
+</html>
