@@ -1,11 +1,12 @@
+cat en_lancer_robot_sur_turtlebot.sh 
 #!/bin/bash
 
 # Charger l'environnement ROS
 source /opt/ros/noetic/setup.bash  # Remplacez "noetic" par votre version
 
 # Configurer les variables réseau
-export ROS_IP="192.168.216.178"  # Ou utilisez : export ROS_IP=$(hostname -I | awk '{print $1}')
-export ROS_HOSTNAME="192.168.216.178"
+export ROS_IP=$(hostname -I | awk '{print $1}')
+export ROS_HOSTNAME=$(hostname -I | awk '{print $1}')
 
 # Fonction pour afficher un séparateur
 show_separator() {
