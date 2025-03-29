@@ -281,6 +281,13 @@
             debugLog.innerHTML = `[${timestamp}] ${message}<br>` + debugLog.innerHTML;
         }
 
+        window.removeWaypoint = function(index) {
+            waypoints.splice(index, 1);
+            updateWaypointsList();
+            drawWaypoints();
+            addDebugLog(`Point ${index + 1} supprimé`);
+        }
+
         // Connexion à ROS
         function connectToROS() {
             addDebugLog('Tentative de connexion à ROS...');
@@ -434,8 +441,7 @@
             }
 
             ctx.putImageData(imageData, 0, 0);
-            addDebugLog(`Carte dessinée ')
-            ${mapData.info.width}x${mapData.info.height})`);
+            addDebugLog(`Carte dessinée (${mapData.info.width}x${mapData.info.height})`);
             drawWaypoints();
         }
 
@@ -520,12 +526,12 @@
             });
         }
 
-        function removeWaypoint(index) {
+        /* function removeWaypoint(index) {
             waypoints.splice(index, 1);
             updateWaypointsList();
             drawWaypoints();
             addDebugLog(`Point ${index + 1} supprimé`);
-        }
+        } */
 
         function drawWaypoints() {
             if (!currentMapData) return;

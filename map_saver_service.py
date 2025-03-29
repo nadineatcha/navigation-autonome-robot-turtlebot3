@@ -5,8 +5,8 @@ import subprocess
 import os
 from std_srvs.srv import Trigger, TriggerResponse
 
-# Répertoire où les cartes seront sauvegardées
-MAPS_DIR = os.path.expanduser("maps/")
+# Définir le répertoire avec un chemin absolu
+MAPS_DIR = os.path.expanduser("~/maps/")
 
 def handle_save_map(req):
     """Gestionnaire pour le service de sauvegarde de carte"""
@@ -29,6 +29,20 @@ def handle_save_map(req):
         stdout, stderr = process.communicate()
         
         if process.returncode == 0:
+            # Correction du fichier YAML généré
+            yaml_file = f"{map_path}.yaml"
+            if os.path.exists(yaml_file):
+                # Lire le contenu
+                with open(yaml_file, 'r') as f:
+                    yaml_content = f.read()
+                
+                # Corriger le chemin de l'image (supprimer maps/ du chemin)
+                yaml_content = yaml_content.replace('image: maps/', 'image: ')
+                
+                # Écrire le contenu corrigé
+                with open(yaml_file, 'w') as f:
+                    f.write(yaml_content)
+            
             response.success = True
             response.message = f"Carte sauvegardée avec succès: {map_path}"
             rospy.loginfo(f"Carte sauvegardée: {map_path}")

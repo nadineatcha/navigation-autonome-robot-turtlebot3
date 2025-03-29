@@ -6,8 +6,8 @@ import os
 from std_srvs.srv import Trigger, TriggerResponse
 import glob
 
-# Répertoire où les cartes sont sauvegardées
-MAPS_DIR = os.path.expanduser("maps/")
+# Répertoire où les cartes sont sauvegardées avec chemin absolu
+MAPS_DIR = os.path.expanduser("~/maps/")
 
 def handle_start_navigation(req):
     """Gestionnaire pour le service de lancement de navigation"""
@@ -25,7 +25,7 @@ def handle_start_navigation(req):
         
         # Trier les cartes par date de modification (la plus récente en premier)
         map_files.sort(key=os.path.getmtime, reverse=True)
-        latest_map = map_files[0]
+        latest_map = os.path.abspath(map_files[0])  # Utiliser le chemin absolu
         
         # Vérifier si navigation est déjà en cours
         ps_output = subprocess.check_output(["ps", "-ef"]).decode("utf-8")
@@ -35,7 +35,7 @@ def handle_start_navigation(req):
             rospy.logwarn("Tentative de lancement alors que navigation est déjà en cours")
             return response
         
-        # Lancer navigation avec la carte la plus récente
+        # Lancer navigation avec la carte la plus récente en utilisant le chemin absolu
         cmd = ["roslaunch", "turtlebot3_navigation", "turtlebot3_navigation.launch", 
                f"map_file:={latest_map}", "initial_pose_x:=0.0", "initial_pose_y:=0.0", "initial_pose_a:=0.0"]
         
