@@ -332,7 +332,23 @@
 
         document.getElementById('saveMap').addEventListener('click', function() {
             addDebugLog('Demande de sauvegarde de la carte...');
-            // Commande système pour sauvegarder la carte
+            
+            // Appel au service de sauvegarde de carte
+            const saveMapService = new ROSLIB.Service({
+                ros: ros,
+                name: '/save_map',
+                serviceType: 'std_srvs/Trigger'
+            });
+
+            const request = new ROSLIB.ServiceRequest({});
+            
+            saveMapService.callService(request, function(result) {
+                if (result.success) {
+                    addDebugLog('Carte sauvegardée avec succès: ' + result.message);
+                } else {
+                    addDebugLog('Erreur lors de la sauvegarde: ' + result.message);
+                }
+            });
         });
     </script>
 </body>
