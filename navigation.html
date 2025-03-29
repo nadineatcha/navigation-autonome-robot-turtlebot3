@@ -668,21 +668,40 @@
             addDebugLog('Points effacés');
         });
 
+        // Mise à jour du gestionnaire d'événement pour le bouton "Démarrer la navigation"
         document.getElementById('startDemo').addEventListener('click', function() {
             if (!demoRunning) {
                 if (waypoints.length === 0) {
                     addDebugLog('Erreur: Aucun point défini');
                     return;
                 }
-                if (!robotPosition) {
-                    addDebugLog('Erreur: Position du robot inconnue');
-                    return;
-                }
-                demoRunning = true;
-                demoPaused = false;
-                currentWaypointIndex = 0;
-                addDebugLog('Démarrage de la navigation');
-                navigateToNextWaypoint();
+
+                // Appeler le service pour démarrer la navigation
+                const startNavigationService = new ROSLIB.Service({
+                    ros: ros,
+                    name: '/start_navigation',
+                    serviceType: 'std_srvs/Trigger'
+                });
+
+                const request = new ROSLIB.ServiceRequest({});
+                
+                addDebugLog('Demande de démarrage de la navigation...');
+                
+                startNavigationService.callService(request, function(result) {
+                    if (result.success) {
+                        addDebugLog('Navigation démarrée: ' + result.message);
+                        
+                        // Attendre un petit moment pour que la navigation soit initialisée
+                        setTimeout(function() {
+                            demoRunning = true;
+                            demoPaused = false;
+                            currentWaypointIndex = 0;
+                            navigateToNextWaypoint();
+                        }, 3000);
+                    } else {
+                        addDebugLog('Erreur: ' + result.message);
+                    }
+                });
             }
         });
 
@@ -693,12 +712,31 @@
             }
         });
 
+        // Mise à jour du gestionnaire d'événement pour le bouton "Arrêter"
         document.getElementById('stopDemo').addEventListener('click', function() {
             if (demoRunning) {
                 demoRunning = false;
                 demoPaused = false;
                 currentWaypointIndex = 0;
-                addDebugLog('Navigation arrêtée');
+                
+                // Appeler le service pour arrêter la navigation
+                const stopNavigationService = new ROSLIB.Service({
+                    ros: ros,
+                    name: '/stop_navigation',
+                    serviceType: 'std_srvs/Trigger'
+                });
+
+                const request = new ROSLIB.ServiceRequest({});
+                
+                addDebugLog('Demande d\'arrêt de la navigation...');
+                
+                stopNavigationService.callService(request, function(result) {
+                    if (result.success) {
+                        addDebugLog('Navigation arrêtée: ' + result.message);
+                    } else {
+                        addDebugLog('Erreur lors de l\'arrêt: ' + result.message);
+                    }
+                });
                 
                 // Arrêter le robot
                 if (ros) {
@@ -713,6 +751,7 @@
                         angular: { x: 0, y: 0, z: 0 }
                     });
                     cmdVel.publish(twist);
+                    addDebugLog('Robot arrêté');
                 }
             }
         });

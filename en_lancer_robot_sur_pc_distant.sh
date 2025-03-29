@@ -37,7 +37,14 @@ echo "ℹ️  Ces paramètres seront chargés automatiquement dans tous les nouv
 
 # Charger l'environnement ROS
 source /opt/ros/noetic/setup.bash  # Remplacez "noetic" par votre version de ROS
-source ~/catkin_ws/devel/setup.bash  # Ajouté pour charger votre workspace
+source ~/catkin_ws/devel/setup.bash  # Chargement de votre workspace
+
+# Création du répertoire pour les cartes s'il n'existe pas
+MAPS_DIR=~/maps
+if [ ! -d "$MAPS_DIR" ]; then
+    mkdir -p "$MAPS_DIR"
+    echo "📁 Création du répertoire pour les cartes: $MAPS_DIR"
+fi
 
 # Lancement du pont websocket
 echo "🌐 Lancement du pont websocket..."
@@ -55,30 +62,29 @@ slam_pid=$!
 sleep 3
 show_separator "SLAM est maintenant actif et fonctionnel!"
 
-# Lancement de la navigation (en utilisant la carte SLAM en direct)
-echo "🧭 Lancement de la navigation..."
-roslaunch turtlebot3_navigation turtlebot3_navigation.launch use_map_topic:=true initial_pose_x:=0.0 initial_pose_y:=0.0 initial_pose_a:=0.0 &
-navigation_pid=$!
-sleep 3
-show_separator "NAVIGATION est maintenant active et fonctionnelle!"
-
-# Création d'un service de sauvegarde de carte
-echo "💾 Configuration du service de sauvegarde de carte..."
-# Lancement d'un noeud Python personnalisé pour sauvegarder la carte
-# (Ce script devra être créé séparément)
-python3 ~/catkin_ws/src/map_saver_service.py &
+# Lancement du service de sauvegarde de carte
+echo "💾 Lancement du service de sauvegarde de carte..."
+python3 map_saver_service.py &
 map_saver_pid=$!
+sleep 1
 show_separator "SERVICE DE SAUVEGARDE est maintenant actif et fonctionnel!"
 
+# Lancement du service de navigation
+echo "🧭 Lancement du service de navigation..."
+python3 navigation_service.py &
+navigation_service_pid=$!
+sleep 1
+show_separator "SERVICE DE NAVIGATION est maintenant actif et fonctionnel!"
+
 # Rappel à la fin du script
-echo -e "\n🔔 RAPPEL: Vous devrez redémarrer vos terminaux existants ou exécuter 'source ~/.bashrc'"
-echo -e "   Les nouveaux terminaux chargeront automatiquement cette configuration."
+echo -e "\n🔔 RAPPEL: La navigation peut être démarrée depuis l'interface web après avoir sauvegardé une carte."
 echo -e "\n🤖 Tous les services sont maintenant en cours d'exécution. Pressez Ctrl+C pour tout arrêter."
 
 # Attendre que l'utilisateur termine avec Ctrl+C
-wait $websocket_pid $slam_pid $navigation_pid $map_saver_pid
+wait $websocket_pid $slam_pid $map_saver_pid $navigation_service_pid
 
 # Nettoyage lors de la sortie
 echo -e "\n🛑 Arrêt des processus..."
-kill $websocket_pid $slam_pid $navigation_pid $map_saver_pid 2>/dev/null
+kill $websocket_pid $slam_pid $map_saver_pid $navigation_service_pid 2>/dev/null
+pkill -f "turtlebot3_navigation" 2>/dev/null
 echo "✅ Tous les processus ont été arrêtés."
