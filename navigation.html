@@ -193,6 +193,17 @@
                 min-height: 400px;
             }
         }
+
+        .control-button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .control-button.active {
+            background: #4ade80;
+        }
     </style>
 </head>
 <body>
@@ -225,8 +236,12 @@
         <div class="controls-panel">
             <div id="status" class="status">Déconnecté</div>
             
-            <button id="startDemo" class="control-button">
-                <i class="fas fa-play"></i> Démarrer la navigation
+            <button id="initNavigation" class="control-button">
+                <i class="fas fa-cog"></i> Initialiser Navigation
+            </button>
+            
+            <button id="startRoute" class="control-button" disabled>
+                <i class="fas fa-play"></i> Démarrer Parcours
             </button>
             
             <button id="pauseDemo" class="control-button">
@@ -675,13 +690,9 @@
         });
 
         // Mise à jour du gestionnaire d'événement pour le bouton "Démarrer la navigation"
-        document.getElementById('startDemo').addEventListener('click', function() {
+        // Par ces deux gestionnaires d'événements
+        document.getElementById('initNavigation').addEventListener('click', function() {
             if (!demoRunning) {
-                if (waypoints.length === 0) {
-                    addDebugLog('Erreur: Aucun point défini');
-                    return;
-                }
-
                 // Appeler le service pour démarrer la navigation
                 const startNavigationService = new ROSLIB.Service({
                     ros: ros,
@@ -691,19 +702,16 @@
 
                 const request = new ROSLIB.ServiceRequest({});
                 
-                addDebugLog('Demande de démarrage de la navigation...');
+                addDebugLog('Initialisation de la navigation...');
                 
                 startNavigationService.callService(request, function(result) {
                     if (result.success) {
-                        addDebugLog('Navigation démarrée: ' + result.message);
+                        addDebugLog('Navigation initialisée: ' + result.message);
                         
-                        // Attendre un petit moment pour que la navigation soit initialisée
-                        setTimeout(function() {
-                            demoRunning = true;
-                            demoPaused = false;
-                            currentWaypointIndex = 0;
-                            navigateToNextWaypoint();
-                        }, 3000);
+                        // Activer le bouton de démarrage du parcours
+                        document.getElementById('startRoute').disabled = false;
+                        // Désactiver ce bouton pour éviter de relancer
+                        document.getElementById('initNavigation').disabled = true;
                     } else {
                         addDebugLog('Erreur: ' + result.message);
                     }
@@ -711,10 +719,38 @@
             }
         });
 
+        document.getElementById('startRoute').addEventListener('click', function() {
+            if (waypoints.length === 0) {
+                addDebugLog('Erreur: Aucun point défini');
+                return;
+            }
+            
+            demoRunning = true;
+            demoPaused = false;
+            currentWaypointIndex = 0;
+            navigateToNextWaypoint();
+            
+            addDebugLog('Démarrage du parcours autonome');
+            document.getElementById('startRoute').disabled = true;
+            document.getElementById('pauseDemo').disabled = false;
+            document.getElementById('stopDemo').disabled = false;
+        });
+
         document.getElementById('pauseDemo').addEventListener('click', function() {
-            if (demoRunning) {
+        if (demoRunning) {
                 demoPaused = !demoPaused;
-                addDebugLog(demoPaused ? 'Navigation en pause' : 'Reprise de la navigation');
+                addDebugLog(demoPaused ? 'Parcours en pause' : 'Reprise du parcours');
+                
+                // Mise à jour visuelle du bouton
+                if (demoPaused) {
+                    this.innerHTML = '<i class="fas fa-play"></i> Reprendre';
+                } else {
+                    this.innerHTML = '<i class="fas fa-pause"></i> Pause';
+                    // Si on reprend, continuer la navigation
+                    if (currentWaypointIndex < waypoints.length) {
+                        navigateToNextWaypoint();
+                    }
+                }
             }
         });
 
@@ -759,6 +795,11 @@
                     cmdVel.publish(twist);
                     addDebugLog('Robot arrêté');
                 }
+
+                // Réinitialisation des boutons
+                document.getElementById('startRoute').disabled = false;
+                document.getElementById('pauseDemo').disabled = true;
+                document.getElementById('stopDemo').disabled = true;
             }
         });
 
@@ -767,6 +808,23 @@
             connectToROS();
             canvas.width = canvas.offsetWidth;
             canvas.height = canvas.offsetHeight;
+            
+            // Initialisation des états des boutons
+            document.getElementById('startRoute').disabled = true;
+            document.getElementById('pauseDemo').disabled = true;
+            document.getElementById('stopDemo').disabled = true;
+            
+            // Vérifier si la navigation est déjà en cours
+            if (ros) {
+                ros.getNodes(function(nodes) {
+                    if (nodes.indexOf('/move_base') !== -1) {
+                        // La navigation est déjà en cours
+                        document.getElementById('initNavigation').disabled = true;
+                        document.getElementById('startRoute').disabled = false;
+                        addDebugLog('Navigation déjà initialisée');
+                    }
+                });
+            }
         });
 
         window.addEventListener('resize', function() {
