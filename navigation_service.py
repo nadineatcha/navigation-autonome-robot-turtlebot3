@@ -37,13 +37,14 @@ def handle_start_navigation(req):
         
         # Lancer navigation avec la carte la plus récente en utilisant le chemin absolu
         cmd = ["roslaunch", "turtlebot3_navigation", "turtlebot3_navigation.launch", 
-               f"map_file:={latest_map}", "initial_pose_x:=0.0", "initial_pose_y:=0.0", "initial_pose_a:=0.0"]
+               f"map_file:={latest_map}", "initial_pose_x:=0.0", "initial_pose_y:=0.0", "initial_pose_a:=0.0", "open_rviz:=true"]
         
         subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         response.success = True
         response.message = f"Navigation démarrée avec la carte: {os.path.basename(latest_map)}"
         rospy.loginfo(f"Navigation démarrée avec: {latest_map}")
+        rospy.loginfo(f"Commande exécutée : {' '.join(cmd)}")
         
     except Exception as e:
         response.success = False
