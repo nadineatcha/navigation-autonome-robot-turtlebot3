@@ -76,15 +76,47 @@ navigation_service_pid=$!
 sleep 1
 show_separator "SERVICE DE NAVIGATION est maintenant actif et fonctionnel!"
 
+# Démarrage automatique de la navigation avec la dernière carte
+echo "🧭 Démarrage automatique de la navigation avec la dernière carte..."
+python3 -c '
+import glob
+import os
+import subprocess
+import time
+
+# Attendre un peu que tous les services soient bien initialisés
+time.sleep(5)
+
+MAPS_DIR = os.path.expanduser("~/maps/")
+map_files = glob.glob(os.path.join(MAPS_DIR, "*.yaml"))
+
+if map_files:
+    # Trier les cartes par date de modification (la plus récente en premier)
+    map_files.sort(key=os.path.getmtime, reverse=True)
+    latest_map = os.path.abspath(map_files[0])
+    
+    # Lancer la navigation avec la carte la plus récente
+    cmd = ["roslaunch", "turtlebot3_navigation", "turtlebot3_navigation.launch", 
+           f"map_file:={latest_map}", "initial_pose_x:=0.0", "initial_pose_y:=0.0", "initial_pose_a:=0.0"]
+    
+    subprocess.Popen(cmd)
+    print(f"Navigation démarrée avec la carte: {latest_map}")
+else:
+    print("Aucune carte trouvée. Navigation non démarrée.")
+' &
+auto_nav_pid=$!
+sleep 5
+show_separator "NAVIGATION AUTOMATIQUE initialisée!"
+
 # Rappel à la fin du script
-echo -e "\n🔔 RAPPEL: La navigation peut être démarrée depuis l'interface web après avoir sauvegardé une carte."
+echo -e "\n🔔 RAPPEL: La navigation est automatiquement démarrée avec la dernière carte disponible."
 echo -e "\n🤖 Tous les services sont maintenant en cours d'exécution. Pressez Ctrl+C pour tout arrêter."
 
 # Attendre que l'utilisateur termine avec Ctrl+C
-wait $websocket_pid $slam_pid $map_saver_pid $navigation_service_pid
+wait $websocket_pid $slam_pid $map_saver_pid $navigation_service_pid $auto_nav_pid
 
 # Nettoyage lors de la sortie
 echo -e "\n🛑 Arrêt des processus..."
-kill $websocket_pid $slam_pid $map_saver_pid $navigation_service_pid 2>/dev/null
+kill $websocket_pid $slam_pid $map_saver_pid $navigation_service_pid $auto_nav_pid 2>/dev/null
 pkill -f "turtlebot3_navigation" 2>/dev/null
 echo "✅ Tous les processus ont été arrêtés."
