@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Navigation Autonome TurtleBot3</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.1.0/roslib.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #2563eb, #1e40af);
+            --secondary-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
+            --text-color: #1f2937;
+            --light-bg: #f8fafc;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            background-color: #f0f4f8;
+            color: var(--text-color);
+        }
+
+        .nav-menu {
+            background: var(--primary-gradient);
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+
+        .header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 2rem 1rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .navigation-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 2rem;
+        }
+
+        .map-view {
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            padding: 1rem;
+            min-height: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .controls-panel {
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+        }
+
+        .status {
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            background-color: #f87171;
+            color: #7f1d1d;
+            transition: all 0.3s ease;
+        }
+
+        .connected {
+            background-color: #4ade80;
+            color: #064e3b;
+        }
+
+        .waypoint-list {
+            margin: 1rem 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .waypoint-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            background: var(--light-bg);
+            border-radius: 4px;
+        }
+
+        .control-button {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary-gradient);
+            color: white;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .control-button:active {
+            transform: translateY(0);
+        }
+
+        .debug-info {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--light-bg);
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .map-canvas {
+            width: 100%;
+            height: 100%;
+            background: #eee;
+            border-radius: 8px;
+            cursor: crosshair;
+        }
+
+        .control-button.active {
+            background: #4ade80;
+        }
+
+        @media (max-width: 1024px) {
+            .navigation-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .map-view {
+                min-height: 400px;
+            }
+        }
+
+        .control-button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .control-button.active {
+            background: #4ade80;
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-menu">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <a href="index.html" style="color: white; text-decoration: none;">
+                    <i class="fas fa-robot"></i> TurtleBot3
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Accueil</a>
+                <a href="controle.html">Contrôle</a>
+                <a href="cartographie.html">Cartographie</a>
+                <a href="navigation.html">Navigation</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="header">
+        <h1>Navigation Autonome TurtleBot3</h1>
+        <p>Configuration et exécution de parcours autonomes</p>
+    </header>
+
+    <div class="navigation-container">
+        <div class="map-view">
+            <canvas id="mapCanvas" class="map-canvas"></canvas>
+        </div>
+
+        <div class="controls-panel">
+            <div id="status" class="status">Déconnecté</div>
+            
+            <button id="initNavigation" class="control-button">
+                <i class="fas fa-cog"></i> Initialiser Navigation
+            </button>
+            
+            <button id="startRoute" class="control-button" disabled>
+                <i class="fas fa-play"></i> Démarrer Parcours
+            </button>
+            
+            <button id="pauseDemo" class="control-button">
+                <i class="fas fa-pause"></i> Pause
+            </button>
+            
+            <button id="stopDemo" class="control-button">
+                <i class="fas fa-stop"></i> Arrêter
+            </button>
+
+            <button id="addWaypoint" class="control-button">
+                <i class="fas fa-plus"></i> Ajouter des points
+            </button>
+
+            <button id="clearWaypoints" class="control-button">
+                <i class="fas fa-trash"></i> Effacer les points
+            </button>
+
+            <div id="waypoints" class="waypoint-list">
+                <!-- Points de passage ajoutés dynamiquement -->
+            </div>
+
+            <div class="debug-info" id="debug-log">
+                Logs de navigation...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let ros = null;
+        let mapResolution = 0.05;
+        let mapOrigin = { x: 0, y: 0 };
+        let currentMapData = null;
+        let waypoints = [];
+        let demoRunning = false;
+        let demoPaused = false;
+        let currentWaypointIndex = 0;
+        let moveBaseGoal = null;
+        let robotPosition = null;
+        let mapScale = 1;
+        let originalMapWidth = 0;
+        let originalMapHeight = 0;
+
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Fonction pour les logs
+        function addDebugLog(message) {
+            const debugLog = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.innerHTML = `[${timestamp}] ${message}<br>` + debugLog.innerHTML;
+        }
+
+        window.removeWaypoint = function(index) {
+            waypoints.splice(index, 1);
+            updateWaypointsList();
+            drawWaypoints();
+            addDebugLog(`Point ${index + 1} supprimé`);
+        }
+
+        // Connexion à ROS
+        function connectToROS() {
+            addDebugLog('Tentative de connexion à ROS...');
+            
+            ros = new ROSLIB.Ros({
+                url: 'ws://localhost:9090'
+            });
+
+            ros.on('connection', function() {
+                addDebugLog('Connecté à ROS');
+                document.getElementById('status').textContent = 'Connecté';
+                document.getElementById('status').classList.add('connected');
+                
+                // Vérifier les topics disponibles
+                ros.getTopics(function(result) {
+                    const topics = result.topics || [];
+                    topics.forEach(topic => {
+                        addDebugLog(`Topic trouvé: ${topic}`);
+                    });
+                });
+
+                // Initialiser le topic move_base
+                moveBaseGoal = new ROSLIB.Topic({
+                    ros: ros,
+                    name: '/move_base_simple/goal',
+                    messageType: 'geometry_msgs/PoseStamped'
+                });
+
+                setupSubscribers();
+            });
+
+            ros.on('error', function(error) {
+                addDebugLog(`Erreur de connexion ROS: ${error}`);
+                document.getElementById('status').textContent = 'Erreur de connexion';
+                document.getElementById('status').classList.remove('connected');
+                setTimeout(connectToROS, 3000);
+            });
+
+            ros.on('close', function() {
+                addDebugLog('Connexion ROS fermée');
+                document.getElementById('status').textContent = 'Déconnecté';
+                document.getElementById('status').classList.remove('connected');
+                setTimeout(connectToROS, 3000);
+            });
+        }
+
+        // Configuration des souscriptions ROS
+        function setupSubscribers() {
+            // Souscription à la carte
+            const mapListener = new ROSLIB.Topic({
+                ros: ros,
+                name: '/map',
+                messageType: 'nav_msgs/OccupancyGrid'
+            });
+
+            mapListener.subscribe(function(message) {
+                addDebugLog('Nouvelle carte reçue');
+                drawMap(message);
+            });
+
+            // Souscription à la position du robot
+            const poseListener = new ROSLIB.Topic({
+                ros: ros,
+                name: '/amcl_pose',
+                messageType: 'geometry_msgs/PoseWithCovarianceStamped'
+            });
+
+            poseListener.subscribe(function(message) {
+                robotPosition = message.pose.pose;
+                if (demoRunning && !demoPaused) {
+                    checkGoalReached();
+                }
+                updateRobotPosition(message.pose.pose);
+            });
+
+            // Souscription au statut de move_base
+            const moveBaseStatus = new ROSLIB.Topic({
+                ros: ros,
+                name: '/move_base/status',
+                messageType: 'actionlib_msgs/GoalStatusArray'
+            });
+
+            moveBaseStatus.subscribe(function(message) {
+                if (message.status_list && message.status_list.length > 0) {
+                    const status = message.status_list[0].status;
+                    switch(status) {
+                        case 1:
+                            addDebugLog('Robot en mouvement');
+                            break;
+                        case 3:
+                            addDebugLog('Point atteint');
+                            break;
+                        case 4:
+                            addDebugLog('Navigation impossible');
+                            demoRunning = false;
+                            break;
+                    }
+                }
+            });
+        }
+
+        // Dessin de la carte
+        function drawMap(mapData) {
+            currentMapData = mapData;
+            mapResolution = mapData.info.resolution;
+            mapOrigin = {
+                x: mapData.info.origin.position.x,
+                y: mapData.info.origin.position.y
+            };
+
+            // Sauvegarder les dimensions originales
+            originalMapWidth = mapData.info.width;
+            originalMapHeight = mapData.info.height;
+
+            // Calculer l'échelle une seule fois
+            const container = canvas.parentElement;
+            mapScale = Math.min(
+                container.offsetWidth / mapData.info.width,
+                container.offsetHeight / mapData.info.height
+            );
+
+            // Appliquer l'échelle
+            canvas.width = mapData.info.width;
+            canvas.height = mapData.info.height;
+            canvas.style.width = (mapData.info.width * mapScale) + 'px';
+            canvas.style.height = (mapData.info.height * mapScale) + 'px';
+
+            const imageData = ctx.createImageData(mapData.info.width, mapData.info.height);
+            const data = imageData.data;
+
+            for (let i = 0; i < mapData.data.length; i++) {
+                const val = mapData.data[i];
+                const idx = i * 4;
+                
+                if (val === -1) { // Inconnu
+                    data[idx] = 192;
+                    data[idx + 1] = 192;
+                    data[idx + 2] = 192;
+                    data[idx + 3] = 255;
+                } else if (val === 100) { // Occupé
+                    data[idx] = 0;
+                    data[idx + 1] = 0;
+                    data[idx + 2] = 0;
+                    data[idx + 3] = 255;
+                } else { // Libre
+                    data[idx] = 255;
+                    data[idx + 1] = 255;
+                    data[idx + 2] = 255;
+                    data[idx + 3] = 255;
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            addDebugLog(`Carte dessinée (${mapData.info.width}x${mapData.info.height})`);
+            drawWaypoints();
+        }
+
+        // Conversion des coordonnées
+        function canvasToROS(canvasX, canvasY) {
+            if (!currentMapData) return null;
+
+            // Tenir compte de l'échelle fixe
+            const mapX = (canvasX / mapScale);
+            const mapY = (canvasY / mapScale);
+
+            // Convertir en coordonnées ROS
+            const rosX = mapX * mapResolution + mapOrigin.x;
+            const rosY = mapY * mapResolution + mapOrigin.y;
+
+            return { x: rosX, y: rosY };
+        }
+
+        function ROSToCanvas(rosX, rosY) {
+            if (!currentMapData) return null;
+
+            // Convertir de ROS vers la carte
+            const mapX = (rosX - mapOrigin.x) / mapResolution;
+            const mapY = (rosY - mapOrigin.y) / mapResolution;
+
+            // Appliquer l'échelle fixe
+            const canvasX = mapX * mapScale;
+            const canvasY = mapY * mapScale;
+
+            return { x: canvasX, y: canvasY };
+        }
+
+        // Vérification de l'arrivée au point
+        function checkGoalReached() {
+            if (!robotPosition || currentWaypointIndex >= waypoints.length) return;
+            
+            const currentGoal = waypoints[currentWaypointIndex];
+            const distance = Math.sqrt(
+                Math.pow(robotPosition.position.x - currentGoal.x, 2) +
+                Math.pow(robotPosition.position.y - currentGoal.y, 2)
+            );
+            
+            // Si on est à moins de 0.2m du point
+            if (distance < 0.2) {
+                addDebugLog(`Point ${currentWaypointIndex + 1} atteint`);
+                currentWaypointIndex++;
+                if (currentWaypointIndex < waypoints.length) {
+                    navigateToNextWaypoint();
+                } else {
+                    addDebugLog('Navigation terminée');
+                    demoRunning = false;
+                    currentWaypointIndex = 0;
+                }
+            }
+        }
+
+        // Gestion des points de passage
+        function addWaypoint(canvasX, canvasY) {
+            const rosCoords = canvasToROS(canvasX, canvasY);
+            if (rosCoords) {
+                waypoints.push(rosCoords);
+                updateWaypointsList();
+                drawWaypoints();
+                addDebugLog(`Point ajouté: (${rosCoords.x.toFixed(2)}, ${rosCoords.y.toFixed(2)})`);
+            }
+        }
+
+        function updateWaypointsList() {
+            const waypointsList = document.getElementById('waypoints');
+            waypointsList.innerHTML = '';
+            
+            waypoints.forEach((point, index) => {
+                const item = document.createElement('div');
+                item.className = 'waypoint-item';
+                item.innerHTML = `
+                    <span>Point ${index + 1}: (${point.x.toFixed(2)}, ${point.y.toFixed(2)})</span>
+                    <button onclick="removeWaypoint(${index})" class="control-button" style="width: auto; padding: 0.25rem 0.5rem;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `;
+                waypointsList.appendChild(item);
+            });
+        }
+
+        /* function removeWaypoint(index) {
+            waypoints.splice(index, 1);
+            updateWaypointsList();
+            drawWaypoints();
+            addDebugLog(`Point ${index + 1} supprimé`);
+        } */
+
+        function drawWaypoints() {
+            if (!currentMapData) return;
+
+            waypoints.forEach((point, index) => {
+                const canvasCoords = ROSToCanvas(point.x, point.y);
+                if (canvasCoords) {
+                    // Dessiner le point
+                    ctx.beginPath();
+                    ctx.arc(canvasCoords.x, canvasCoords.y, 5, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.fill();
+                    
+                    // Numéro du point
+                    ctx.font = '12px Arial';
+                    ctx.fillStyle = '#1e40af';
+                    ctx.fillText(index + 1, canvasCoords.x + 8, canvasCoords.y + 4);
+                    
+                    // Ligne vers le point suivant
+                    if (index < waypoints.length - 1) {
+                        const nextCanvasCoords = ROSToCanvas(waypoints[index + 1].x, waypoints[index + 1].y);
+                        if (nextCanvasCoords) {
+                            ctx.beginPath();
+                            ctx.moveTo(canvasCoords.x, canvasCoords.y);
+                            ctx.lineTo(nextCanvasCoords.x, nextCanvasCoords.y);
+                            ctx.strokeStyle = '#3b82f6';
+                            ctx.setLineDash([5, 5]);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Mise à jour de la position du robot
+        // Remplacer la fonction updateRobotPosition existante par celle-ci:
+        function updateRobotPosition(pose) {
+            if (!currentMapData) return;
+
+            const canvasCoords = ROSToCanvas(pose.position.x, pose.position.y);
+            if (canvasCoords) {
+                // Sauvegarder l'état actuel du canvas
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                ctx.putImageData(imageData, 0, 0);
+                drawWaypoints();
+                
+                // Dessiner un cercle extérieur pour augmenter la visibilité (effet de halo)
+                ctx.beginPath();
+                ctx.arc(canvasCoords.x, canvasCoords.y, 16, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.3)'; // Rouge semi-transparent
+                ctx.fill();
+                
+                // Robot - cercle plus grand et plus visible
+                ctx.beginPath();
+                ctx.arc(canvasCoords.x, canvasCoords.y, 12, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ef4444'; // Rouge
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff'; // Bordure blanche
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Direction - flèche plus prononcée
+                const angle = 2 * Math.atan2(pose.orientation.z, pose.orientation.w);
+                
+                // Dessiner une flèche directionnelle plus visible
+                const arrowLength = 25;
+                const arrowWidth = 8;
+                
+                // Ligne principale de la flèche
+                ctx.beginPath();
+                ctx.moveTo(canvasCoords.x, canvasCoords.y);
+                const endX = canvasCoords.x + Math.cos(angle) * arrowLength;
+                const endY = canvasCoords.y + Math.sin(angle) * arrowLength;
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Pointe de la flèche
+                ctx.beginPath();
+                const angle1 = angle + Math.PI * 0.8;
+                const angle2 = angle - Math.PI * 0.8;
+                ctx.moveTo(endX, endY);
+                ctx.lineTo(
+                    endX - Math.cos(angle1) * arrowWidth,
+                    endY - Math.sin(angle1) * arrowWidth
+                );
+                ctx.lineTo(
+                    endX - Math.cos(angle2) * arrowWidth,
+                    endY - Math.sin(angle2) * arrowWidth
+                );
+                ctx.closePath();
+                ctx.fillStyle = '#ef4444';
+                ctx.fill();
+                
+                // Ajouter un texte "Robot" à côté
+                ctx.font = 'bold 12px Arial';
+                ctx.fillStyle = '#000000';
+                ctx.fillText('Robot', canvasCoords.x + 20, canvasCoords.y - 10);
+            }
+        }
+
+        // Navigation
+        function sendNavigationGoal(x, y) {
+            if (!ros || !moveBaseGoal) {
+                addDebugLog('Erreur: Système de navigation non initialisé');
+                return;
+            }
+
+            const goal = new ROSLIB.Message({
+                header: {
+                    frame_id: 'map',
+                    stamp: {
+                        secs: Math.floor(Date.now() / 1000),
+                        nsecs: (Date.now() % 1000) * 1000000
+                    }
+                },
+                pose: {
+                    position: {
+                        x: x,
+                        y: y,
+                        z: 0.0
+                    },
+                    orientation: {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0
+                    }
+                }
+            });
+
+            try {
+                moveBaseGoal.publish(goal);
+                addDebugLog(`Navigation vers: (${x.toFixed(2)}, ${y.toFixed(2)})`);
+            } catch (error) {
+                addDebugLog(`Erreur d'envoi: ${error}`);
+            }
+        }
+
+        function navigateToNextWaypoint() {
+            if (!demoRunning || demoPaused) return;
+            
+            if (currentWaypointIndex < waypoints.length) {
+                const waypoint = waypoints[currentWaypointIndex];
+                sendNavigationGoal(waypoint.x, waypoint.y);
+                addDebugLog(`Navigation vers le point ${currentWaypointIndex + 1}`);
+            }
+        }
+
+        // Événements
+        canvas.addEventListener('click', function(event) {
+            if (document.getElementById('addWaypoint').classList.contains('active')) {
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                addWaypoint(x, y);
+            }
+        });
+
+        document.getElementById('addWaypoint').addEventListener('click', function() {
+            this.classList.toggle('active');
+            if (this.classList.contains('active')) {
+                addDebugLog('Mode ajout de points activé - Cliquez sur la carte');
+                this.style.background = '#4ade80';
+            } else {
+                addDebugLog('Mode ajout de points désactivé');
+                this.style.background = '';
+            }
+        });
+
+        document.getElementById('clearWaypoints').addEventListener('click', function() {
+            waypoints = [];
+            updateWaypointsList();
+            drawMap(currentMapData);
+            addDebugLog('Points effacés');
+        });
+
+        // Mise à jour du gestionnaire d'événement pour le bouton "Démarrer la navigation"
+        // Par ces deux gestionnaires d'événements
+        document.getElementById('initNavigation').addEventListener('click', function() {
+            if (!demoRunning) {
+                // Appeler le service pour démarrer la navigation
+                const startNavigationService = new ROSLIB.Service({
+                    ros: ros,
+                    name: '/start_navigation',
+                    serviceType: 'std_srvs/Trigger'
+                });
+
+                const request = new ROSLIB.ServiceRequest({});
+                
+                addDebugLog('Initialisation de la navigation...');
+                
+                startNavigationService.callService(request, function(result) {
+                    if (result.success) {
+                        addDebugLog('Navigation initialisée: ' + result.message);
+                        
+                        // Activer le bouton de démarrage du parcours
+                        document.getElementById('startRoute').disabled = false;
+                        // Désactiver ce bouton pour éviter de relancer
+                        document.getElementById('initNavigation').disabled = true;
+                    } else {
+                        addDebugLog('Erreur: ' + result.message);
+                    }
+                });
+            }
+        });
+
+        document.getElementById('startRoute').addEventListener('click', function() {
+            if (waypoints.length === 0) {
+                addDebugLog('Erreur: Aucun point défini');
+                return;
+            }
+            
+            demoRunning = true;
+            demoPaused = false;
+            currentWaypointIndex = 0;
+            navigateToNextWaypoint();
+            
+            addDebugLog('Démarrage du parcours autonome');
+            document.getElementById('startRoute').disabled = true;
+            document.getElementById('pauseDemo').disabled = false;
+            document.getElementById('stopDemo').disabled = false;
+        });
+
+        document.getElementById('pauseDemo').addEventListener('click', function() {
+        if (demoRunning) {
+                demoPaused = !demoPaused;
+                addDebugLog(demoPaused ? 'Parcours en pause' : 'Reprise du parcours');
+                
+                // Mise à jour visuelle du bouton
+                if (demoPaused) {
+                    this.innerHTML = '<i class="fas fa-play"></i> Reprendre';
+                } else {
+                    this.innerHTML = '<i class="fas fa-pause"></i> Pause';
+                    // Si on reprend, continuer la navigation
+                    if (currentWaypointIndex < waypoints.length) {
+                        navigateToNextWaypoint();
+                    }
+                }
+            }
+        });
+
+        // Mise à jour du gestionnaire d'événement pour le bouton "Arrêter"
+        document.getElementById('stopDemo').addEventListener('click', function() {
+            if (demoRunning) {
+                demoRunning = false;
+                demoPaused = false;
+                currentWaypointIndex = 0;
+                
+                // Appeler le service pour arrêter la navigation
+                const stopNavigationService = new ROSLIB.Service({
+                    ros: ros,
+                    name: '/stop_navigation',
+                    serviceType: 'std_srvs/Trigger'
+                });
+
+                const request = new ROSLIB.ServiceRequest({});
+                
+                addDebugLog('Demande d\'arrêt de la navigation...');
+                
+                stopNavigationService.callService(request, function(result) {
+                    if (result.success) {
+                        addDebugLog('Navigation arrêtée: ' + result.message);
+                    } else {
+                        addDebugLog('Erreur lors de l\'arrêt: ' + result.message);
+                    }
+                });
+                
+                // Arrêter le robot
+                if (ros) {
+                    const cmdVel = new ROSLIB.Topic({
+                        ros: ros,
+                        name: '/cmd_vel',
+                        messageType: 'geometry_msgs/Twist'
+                    });
+                    
+                    const twist = new ROSLIB.Message({
+                        linear: { x: 0, y: 0, z: 0 },
+                        angular: { x: 0, y: 0, z: 0 }
+                    });
+                    cmdVel.publish(twist);
+                    addDebugLog('Robot arrêté');
+                }
+
+                // Réinitialisation des boutons
+                document.getElementById('startRoute').disabled = false;
+                document.getElementById('pauseDemo').disabled = true;
+                document.getElementById('stopDemo').disabled = true;
+            }
+        });
+
+        // Initialisation
+        window.addEventListener('load', function() {
+            connectToROS();
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            // Initialisation des états des boutons
+            document.getElementById('startRoute').disabled = true;
+            document.getElementById('pauseDemo').disabled = true;
+            document.getElementById('stopDemo').disabled = true;
+            
+            // Vérifier si la navigation est déjà en cours
+            if (ros) {
+                ros.getNodes(function(nodes) {
+                    if (nodes.indexOf('/move_base') !== -1) {
+                        // La navigation est déjà en cours
+                        document.getElementById('initNavigation').disabled = true;
+                        document.getElementById('startRoute').disabled = false;
+                        addDebugLog('Navigation déjà initialisée');
+                    }
+                });
+            }
+        });
+
+        window.addEventListener('resize', function() {
+            if (currentMapData) {
+                drawMap(currentMapData);
+            }
+        });
+    </script>
+</body>
+</html>

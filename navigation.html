@@ -96,6 +96,7 @@
             min-height: 600px;
             width: 100%;
             overflow: hidden;
+            position: relative;
         }
 
         .controls-panel {
@@ -125,16 +126,30 @@
             margin: 1rem 0;
             max-height: 200px;
             overflow-y: auto;
+            background-color: var(--light-bg);
+            border-radius: 8px;
+            padding: 0.5rem;
         }
 
         .waypoint-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.5rem;
+            padding: 0.75rem 1rem;
             margin-bottom: 0.5rem;
-            background: var(--light-bg);
-            border-radius: 4px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+
+        .waypoint-item:hover {
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+
+        .waypoint-item span {
+            font-weight: 500;
         }
 
         .control-button {
@@ -161,6 +176,13 @@
             transform: translateY(0);
         }
 
+        .control-button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
         .debug-info {
             margin-top: 1rem;
             padding: 1rem;
@@ -181,7 +203,74 @@
         }
 
         .control-button.active {
-            background: #4ade80;
+            background: linear-gradient(135deg, #4ade80, #22c55e);
+        }
+
+        .map-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            box-shadow: var(--card-shadow);
+        }
+
+        .zoom-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            z-index: 10;
+        }
+
+        .zoom-button {
+            width: 36px;
+            height: 36px;
+            border-radius: 5px;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: var(--card-shadow);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .zoom-button:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+        }
+
+        .waypoint-indicator {
+            position: absolute;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            background-color: #3b82f6;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .target-waypoint {
+            background-color: #f97316;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
         }
 
         @media (max-width: 1024px) {
@@ -192,17 +281,6 @@
             .map-view {
                 min-height: 400px;
             }
-        }
-
-        .control-button:disabled {
-            background: #a0aec0;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .control-button.active {
-            background: #4ade80;
         }
     </style>
 </head>
@@ -231,6 +309,14 @@
     <div class="navigation-container">
         <div class="map-view">
             <canvas id="mapCanvas" class="map-canvas"></canvas>
+            <div class="zoom-controls">
+                <button id="zoomIn" class="zoom-button"><i class="fas fa-plus"></i></button>
+                <button id="zoomOut" class="zoom-button"><i class="fas fa-minus"></i></button>
+                <button id="resetView" class="zoom-button"><i class="fas fa-home"></i></button>
+            </div>
+            <div class="map-info" id="mapInfo">
+                Cliquez pour ajouter des points de navigation
+            </div>
         </div>
 
         <div class="controls-panel">
@@ -244,11 +330,11 @@
                 <i class="fas fa-play"></i> Démarrer Parcours
             </button>
             
-            <button id="pauseDemo" class="control-button">
+            <button id="pauseDemo" class="control-button" disabled>
                 <i class="fas fa-pause"></i> Pause
             </button>
             
-            <button id="stopDemo" class="control-button">
+            <button id="stopDemo" class="control-button" disabled>
                 <i class="fas fa-stop"></i> Arrêter
             </button>
 
@@ -260,8 +346,12 @@
                 <i class="fas fa-trash"></i> Effacer les points
             </button>
 
+            <h3 style="margin: 1rem 0 0.5rem 0;">Points de passage</h3>
             <div id="waypoints" class="waypoint-list">
                 <!-- Points de passage ajoutés dynamiquement -->
+                <div class="waypoint-item" style="color: #888; font-style: italic; justify-content: center;">
+                    Aucun point défini
+                </div>
             </div>
 
             <div class="debug-info" id="debug-log">
@@ -282,9 +372,8 @@
         let currentWaypointIndex = 0;
         let moveBaseGoal = null;
         let robotPosition = null;
-        let mapScale = 1;
-        let originalMapWidth = 0;
-        let originalMapHeight = 0;
+        window.mapTransform = { offsetX: 0, offsetY: 0, scale: 1 };
+        let waypointIndicators = [];
 
         const canvas = document.getElementById('mapCanvas');
         const ctx = canvas.getContext('2d');
@@ -294,12 +383,20 @@
             const debugLog = document.getElementById('debug-log');
             const timestamp = new Date().toLocaleTimeString();
             debugLog.innerHTML = `[${timestamp}] ${message}<br>` + debugLog.innerHTML;
+            
+            // Limiter le nombre de messages pour éviter de surcharger la page
+            const maxLines = 50;
+            const lines = debugLog.innerHTML.split('<br>');
+            if (lines.length > maxLines) {
+                debugLog.innerHTML = lines.slice(0, maxLines).join('<br>');
+            }
         }
 
+        // Fonction pour supprimer un point de passage
         window.removeWaypoint = function(index) {
             waypoints.splice(index, 1);
             updateWaypointsList();
-            drawWaypoints();
+            updateWaypointIndicators();
             addDebugLog(`Point ${index + 1} supprimé`);
         }
 
@@ -319,9 +416,9 @@
                 // Vérifier les topics disponibles
                 ros.getTopics(function(result) {
                     const topics = result.topics || [];
-                    topics.forEach(topic => {
-                        addDebugLog(`Topic trouvé: ${topic}`);
-                    });
+                    const relevantTopics = ['/map', '/move_base/status', '/amcl_pose', '/cmd_vel', '/tf'];
+                    const foundTopics = topics.filter(topic => relevantTopics.includes(topic));
+                    addDebugLog(`${foundTopics.length} topics ROS essentiels trouvés`);
                 });
 
                 // Initialiser le topic move_base
@@ -360,6 +457,7 @@
 
             mapListener.subscribe(function(message) {
                 addDebugLog('Nouvelle carte reçue');
+                currentMapData = message;
                 drawMap(message);
             });
 
@@ -404,69 +502,28 @@
             });
         }
 
-        // Dessin de la carte
-        function drawMap(mapData) {
-            currentMapData = mapData;
-            mapResolution = mapData.info.resolution;
-            mapOrigin = {
-                x: mapData.info.origin.position.x,
-                y: mapData.info.origin.position.y
-            };
+        // Conversion des coordonnées ROS vers le canvas
+        function ROSToCanvas(rosX, rosY) {
+            if (!currentMapData || !window.mapTransform) return null;
 
-            // Sauvegarder les dimensions originales
-            originalMapWidth = mapData.info.width;
-            originalMapHeight = mapData.info.height;
+            // Convertir de ROS vers la carte
+            const mapX = (rosX - mapOrigin.x) / mapResolution;
+            const mapY = (rosY - mapOrigin.y) / mapResolution;
 
-            // Calculer l'échelle une seule fois
-            const container = canvas.parentElement;
-            mapScale = Math.min(
-                container.offsetWidth / mapData.info.width,
-                container.offsetHeight / mapData.info.height
-            );
+            // Appliquer la transformation stockée
+            const canvasX = window.mapTransform.offsetX + mapX * window.mapTransform.scale;
+            const canvasY = window.mapTransform.offsetY + mapY * window.mapTransform.scale;
 
-            // Appliquer l'échelle
-            canvas.width = mapData.info.width;
-            canvas.height = mapData.info.height;
-            canvas.style.width = (mapData.info.width * mapScale) + 'px';
-            canvas.style.height = (mapData.info.height * mapScale) + 'px';
-
-            const imageData = ctx.createImageData(mapData.info.width, mapData.info.height);
-            const data = imageData.data;
-
-            for (let i = 0; i < mapData.data.length; i++) {
-                const val = mapData.data[i];
-                const idx = i * 4;
-                
-                if (val === -1) { // Inconnu
-                    data[idx] = 192;
-                    data[idx + 1] = 192;
-                    data[idx + 2] = 192;
-                    data[idx + 3] = 255;
-                } else if (val === 100) { // Occupé
-                    data[idx] = 0;
-                    data[idx + 1] = 0;
-                    data[idx + 2] = 0;
-                    data[idx + 3] = 255;
-                } else { // Libre
-                    data[idx] = 255;
-                    data[idx + 1] = 255;
-                    data[idx + 2] = 255;
-                    data[idx + 3] = 255;
-                }
-            }
-
-            ctx.putImageData(imageData, 0, 0);
-            addDebugLog(`Carte dessinée (${mapData.info.width}x${mapData.info.height})`);
-            drawWaypoints();
+            return { x: canvasX, y: canvasY };
         }
 
-        // Conversion des coordonnées
+        // Conversion des coordonnées du canvas vers ROS
         function canvasToROS(canvasX, canvasY) {
-            if (!currentMapData) return null;
+            if (!currentMapData || !window.mapTransform) return null;
 
-            // Tenir compte de l'échelle fixe
-            const mapX = (canvasX / mapScale);
-            const mapY = (canvasY / mapScale);
+            // Inverser la transformation
+            const mapX = (canvasX - window.mapTransform.offsetX) / window.mapTransform.scale;
+            const mapY = (canvasY - window.mapTransform.offsetY) / window.mapTransform.scale;
 
             // Convertir en coordonnées ROS
             const rosX = mapX * mapResolution + mapOrigin.x;
@@ -475,18 +532,311 @@
             return { x: rosX, y: rosY };
         }
 
-        function ROSToCanvas(rosX, rosY) {
-            if (!currentMapData) return null;
+        // Fonction pour dessiner la carte
+        function drawMapOnly(mapData) {
+            // Nettoyer le canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Récupérer les dimensions
+            const mapWidth = mapData.info.width;
+            const mapHeight = mapData.info.height;
+            
+            // Calculer l'échelle pour faire tenir la carte dans le canvas avec une marge
+            if (!window.mapTransform.userModified) {
+                const margin = 20; // marge en pixels
+                const scaleX = (canvas.width - 2 * margin) / mapWidth;
+                const scaleY = (canvas.height - 2 * margin) / mapHeight;
+                const scale = Math.min(scaleX, scaleY);
+                
+                // Position centrée
+                window.mapTransform.offsetX = Math.floor((canvas.width - mapWidth * scale) / 2);
+                window.mapTransform.offsetY = Math.floor((canvas.height - mapHeight * scale) / 2);
+                window.mapTransform.scale = scale;
+            }
+            
+            // Créer une imageData pour la carte
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = mapWidth;
+            tempCanvas.height = mapHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            const imageData = tempCtx.createImageData(mapWidth, mapHeight);
+            const data = imageData.data;
+            
+            // Amélioration des couleurs pour un meilleur contraste
+            for (let i = 0; i < mapData.data.length; i++) {
+                const val = mapData.data[i];
+                const idx = i * 4;
+                
+                if (val === -1) { // Inconnu
+                    data[idx] = 180;     // R
+                    data[idx + 1] = 180; // G
+                    data[idx + 2] = 180; // B
+                    data[idx + 3] = 255; // A
+                } else if (val === 100) { // Occupé (obstacles)
+                    data[idx] = 0;       // R
+                    data[idx + 1] = 0;   // G
+                    data[idx + 2] = 0;   // B
+                    data[idx + 3] = 255; // A
+                } else if (val >= 0 && val < 50) { // Probablement libre (gradient de blanc à bleu clair)
+                    const blueIntensity = Math.floor(200 - val * 4);
+                    data[idx] = 255;     // R
+                    data[idx + 1] = 255; // G
+                    data[idx + 2] = 255; // B
+                    data[idx + 3] = 255; // A
+                } else { // Entre 50-99: probabilité d'occupation (gradient de bleu clair à gris)
+                    const intensity = Math.floor(200 - (val - 50) * 2);
+                    data[idx] = intensity;     // R
+                    data[idx + 1] = intensity; // G
+                    data[idx + 2] = 220;       // B (plus bleu)
+                    data[idx + 3] = 255;       // A
+                }
+            }
+            
+            // Mettre l'image sur le canvas temporaire
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            // Dessiner l'image mise à l'échelle sur le canvas principal
+            ctx.imageSmoothingEnabled = false; // Désactiver le lissage pour un rendu plus net
+            ctx.drawImage(
+                tempCanvas,
+                0, 0, mapWidth, mapHeight,
+                window.mapTransform.offsetX, 
+                window.mapTransform.offsetY, 
+                mapWidth * window.mapTransform.scale, 
+                mapHeight * window.mapTransform.scale
+            );
+            
+            // Dessiner une grille pour aider à visualiser l'échelle
+            const gridSize = 1.0; // en mètres
+            const gridSpacingPixels = gridSize / mapResolution * window.mapTransform.scale;
+            
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(200, 200, 200, 0.5)";
+            ctx.lineWidth = 0.5;
+            
+            // Origine (0,0) en ROS
+            const originCanvas = ROSToCanvas(0, 0);
+            
+            if (originCanvas) {
+                // Lignes verticales
+                for (let x = 0; x <= mapWidth; x += gridSize / mapResolution) {
+                    const posX = window.mapTransform.offsetX + x * window.mapTransform.scale;
+                    ctx.moveTo(posX, window.mapTransform.offsetY);
+                    ctx.lineTo(posX, window.mapTransform.offsetY + mapHeight * window.mapTransform.scale);
+                }
+                
+                // Lignes horizontales
+                for (let y = 0; y <= mapHeight; y += gridSize / mapResolution) {
+                    const posY = window.mapTransform.offsetY + y * window.mapTransform.scale;
+                    ctx.moveTo(window.mapTransform.offsetX, posY);
+                    ctx.lineTo(window.mapTransform.offsetX + mapWidth * window.mapTransform.scale, posY);
+                }
+                ctx.stroke();
+                
+                // Axes X et Y plus visibles autour de (0,0)
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(255, 0, 0, 0.8)"; // Axe X en rouge
+                ctx.lineWidth = 1.5;
+                ctx.moveTo(originCanvas.x - 50, originCanvas.y);
+                ctx.lineTo(originCanvas.x + 50, originCanvas.y);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(0, 128, 0, 0.8)"; // Axe Y en vert
+                ctx.lineWidth = 1.5;
+                ctx.moveTo(originCanvas.x, originCanvas.y - 50);
+                ctx.lineTo(originCanvas.x, originCanvas.y + 50);
+                ctx.stroke();
+                
+                // Marquer l'origine
+                ctx.beginPath();
+                ctx.arc(originCanvas.x, originCanvas.y, 5, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(128, 0, 128, 0.8)"; // Violet
+                ctx.fill();
+            }
+            
+            // Dessiner une bordure autour de la carte
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(
+                window.mapTransform.offsetX, 
+                window.mapTransform.offsetY, 
+                mapWidth * window.mapTransform.scale, 
+                mapHeight * window.mapTransform.scale
+            );
+            
+            // Ajouter une échelle
+            const meterSize = 1 / mapResolution * window.mapTransform.scale; // taille d'1m en pixels
+            
+            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+            ctx.fillRect(window.mapTransform.offsetX + 10, window.mapTransform.offsetY + 10, 150, 30);
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+            ctx.strokeRect(window.mapTransform.offsetX + 10, window.mapTransform.offsetY + 10, 150, 30);
+            
+            ctx.beginPath();
+            ctx.moveTo(window.mapTransform.offsetX + 20, window.mapTransform.offsetY + 25);
+            ctx.lineTo(window.mapTransform.offsetX + 20 + meterSize, window.mapTransform.offsetY + 25);
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.font = "12px Arial";
+            ctx.fillStyle = "black";
+            ctx.fillText("1 mètre", window.mapTransform.offsetX + 20 + meterSize/2 - 20, window.mapTransform.offsetY + 20);
+            
+            // Mettre à jour les infos de la carte
+            const mapInfo = document.getElementById('mapInfo');
+            mapInfo.innerHTML = `
+                Dimensions: ${mapWidth}x${mapHeight} pixels | 
+                Résolution: ${mapResolution} m/pixel | 
+                Zoom: ${window.mapTransform.scale.toFixed(2)}x
+            `;
+            
+            return window.mapTransform;
+        }
 
-            // Convertir de ROS vers la carte
-            const mapX = (rosX - mapOrigin.x) / mapResolution;
-            const mapY = (rosY - mapOrigin.y) / mapResolution;
+        // Fonction principale pour dessiner la carte
+        function drawMap(mapData) {
+            // Mettre à jour les variables globales
+            currentMapData = mapData;
+            mapResolution = mapData.info.resolution;
+            mapOrigin = {
+                x: mapData.info.origin.position.x,
+                y: mapData.info.origin.position.y
+            };
+            
+            // Réinitialiser la transformation si c'est une nouvelle carte
+            window.mapTransform.userModified = false;
+            
+            // Dessiner la carte
+            drawMapOnly(mapData);
+            
+            // Dessiner les waypoints
+            drawWaypoints();
+            
+            // Si on a déjà la position du robot, la redessiner
+            if (robotPosition) {
+                updateRobotPosition(robotPosition);
+            }
+            
+            addDebugLog(`Carte mise à jour: ${mapData.info.width}x${mapData.info.height}`);
+        }
 
-            // Appliquer l'échelle fixe
-            const canvasX = mapX * mapScale;
-            const canvasY = mapY * mapScale;
+        // Mise à jour de la position du robot
+        function updateRobotPosition(pose) {
+            if (!currentMapData || !window.mapTransform) return;
 
-            return { x: canvasX, y: canvasY };
+            const canvasCoords = ROSToCanvas(pose.position.x, pose.position.y);
+            if (!canvasCoords) return;
+            
+            // Effet de pulsation pour mettre en évidence le robot
+            const now = Date.now();
+            const pulseSize = 1 + 0.2 * Math.sin(now / 200); // Pulsation douce
+            
+            // Redessiner la carte
+            if (currentMapData) {
+                drawMapOnly(currentMapData);
+                drawWaypoints();
+            }
+            
+            // Cercle de contour extérieur avec lueur
+            ctx.beginPath();
+            ctx.arc(canvasCoords.x, canvasCoords.y, 20 * pulseSize, 0, 2 * Math.PI);
+            const gradient = ctx.createRadialGradient(
+                canvasCoords.x, canvasCoords.y, 5,
+                canvasCoords.x, canvasCoords.y, 20 * pulseSize
+            );
+            gradient.addColorStop(0, 'rgba(255, 100, 100, 0.7)');
+            gradient.addColorStop(1, 'rgba(255, 100, 100, 0)');
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Robot principal - cercle rouge
+            ctx.beginPath();
+            ctx.arc(canvasCoords.x, canvasCoords.y, 12, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(255, 50, 50, 0.9)';
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Cercle intérieur pour texture
+            ctx.beginPath();
+            ctx.arc(canvasCoords.x, canvasCoords.y, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(200, 0, 0, 1)';
+            ctx.fill();
+            
+            // Direction - flèche plus élaborée
+            const angle = 2 * Math.atan2(pose.orientation.z, pose.orientation.w);
+            
+            // Flèche de direction
+            const arrowLength = 30;
+            ctx.save();
+            ctx.translate(canvasCoords.x, canvasCoords.y);
+            ctx.rotate(angle);
+            
+            // Dessiner une flèche triangulaire
+            ctx.beginPath();
+            ctx.moveTo(12, 0); // Départ depuis le bord du cercle
+            ctx.lineTo(arrowLength, -8);
+            ctx.lineTo(arrowLength + 5, 0);
+            ctx.lineTo(arrowLength, 8);
+            ctx.closePath();
+            
+            // Gradient pour la flèche
+            const arrowGradient = ctx.createLinearGradient(12, 0, arrowLength, 0);
+            arrowGradient.addColorStop(0, 'rgba(255, 0, 0, 1)');
+            arrowGradient.addColorStop(1, 'rgba(255, 150, 150, 1)');
+            ctx.fillStyle = arrowGradient;
+            ctx.fill();
+            
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            ctx.restore();
+            
+            // Étiquette "Robot"
+            ctx.save();
+            // Créer un fond arrondi pour le texte "Robot"
+            const label = "Robot";
+            ctx.font = 'bold 14px Arial';
+            const textWidth = ctx.measureText(label).width;
+            
+            // Position décalée pour ne pas couvrir le robot
+            const labelX = canvasCoords.x + 20;
+            const labelY = canvasCoords.y - 20;
+            
+            // Fond blanc semi-transparent avec bordure
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+            ctx.beginPath();
+            if (ctx.roundRect) {
+                ctx.roundRect(labelX - 5, labelY - 14, textWidth + 10, 20, 5);
+            } else {
+                // Fallback pour les navigateurs qui ne supportent pas roundRect
+                ctx.rect(labelX - 5, labelY - 14, textWidth + 10, 20);
+            }
+            ctx.fill();
+            
+            ctx.strokeStyle = 'rgba(100, 100, 100, 0.8)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Texte
+            ctx.fillStyle = 'rgba(200, 0, 0, 1)';
+            ctx.fillText(label, labelX, labelY);
+            ctx.restore();
+            
+            // Afficher les coordonnées
+            const coordsText = `(${pose.position.x.toFixed(2)}, ${pose.position.y.toFixed(2)})`;
+            ctx.font = '12px Arial';
+            ctx.fillStyle = 'black';
+            ctx.fillText(coordsText, canvasCoords.x + 20, canvasCoords.y + 20);
+            
+            // Mettre à jour les indicateurs de waypoints
+            updateWaypointIndicators();
         }
 
         // Vérification de l'arrivée au point
@@ -503,12 +853,19 @@
             if (distance < 0.2) {
                 addDebugLog(`Point ${currentWaypointIndex + 1} atteint`);
                 currentWaypointIndex++;
+                updateWaypointIndicators(); // Mettre à jour l'affichage des indicateurs
+                
                 if (currentWaypointIndex < waypoints.length) {
                     navigateToNextWaypoint();
                 } else {
                     addDebugLog('Navigation terminée');
                     demoRunning = false;
                     currentWaypointIndex = 0;
+                    
+                    // Réactiver les boutons
+                    document.getElementById('startRoute').disabled = false;
+                    document.getElementById('pauseDemo').disabled = true;
+                    document.getElementById('stopDemo').disabled = true;
                 }
             }
         }
@@ -520,20 +877,44 @@
                 waypoints.push(rosCoords);
                 updateWaypointsList();
                 drawWaypoints();
+                updateWaypointIndicators();
                 addDebugLog(`Point ajouté: (${rosCoords.x.toFixed(2)}, ${rosCoords.y.toFixed(2)})`);
+                
+                // Activer le bouton de démarrage si des points sont définis
+                if (waypoints.length > 0) {
+                    document.getElementById('startRoute').disabled = false;
+                }
             }
         }
 
         function updateWaypointsList() {
             const waypointsList = document.getElementById('waypoints');
+            
+            if (waypoints.length === 0) {
+                waypointsList.innerHTML = `
+                    <div class="waypoint-item" style="color: #888; font-style: italic; justify-content: center;">
+                        Aucun point défini
+                    </div>
+                `;
+                return;
+            }
+            
             waypointsList.innerHTML = '';
             
             waypoints.forEach((point, index) => {
                 const item = document.createElement('div');
                 item.className = 'waypoint-item';
+                
+                // Ajouter la classe pour le point actif
+                if (demoRunning && index === currentWaypointIndex) {
+                    item.className += ' active-waypoint';
+                    item.style.backgroundColor = '#fef3c7'; // Fond jaune clair
+                    item.style.borderLeft = '3px solid #f59e0b'; // Bordure gauche orange
+                }
+                
                 item.innerHTML = `
                     <span>Point ${index + 1}: (${point.x.toFixed(2)}, ${point.y.toFixed(2)})</span>
-                    <button onclick="removeWaypoint(${index})" class="control-button" style="width: auto; padding: 0.25rem 0.5rem;">
+                    <button onclick="removeWaypoint(${index})" class="zoom-button" style="width: 28px; height: 28px; margin-left: 8px;">
                         <i class="fas fa-trash"></i>
                     </button>
                 `;
@@ -541,113 +922,109 @@
             });
         }
 
-        /* function removeWaypoint(index) {
-            waypoints.splice(index, 1);
-            updateWaypointsList();
-            drawWaypoints();
-            addDebugLog(`Point ${index + 1} supprimé`);
-        } */
-
         function drawWaypoints() {
             if (!currentMapData) return;
-
+            
+            // Lignes entre les points
+            if (waypoints.length > 1) {
+                ctx.beginPath();
+                
+                // Dessiner des lignes entre les points
+                for (let i = 0; i < waypoints.length; i++) {
+                    const canvasCoords = ROSToCanvas(waypoints[i].x, waypoints[i].y);
+                    if (canvasCoords) {
+                        if (i === 0) {
+                            ctx.moveTo(canvasCoords.x, canvasCoords.y);
+                        } else {
+                            ctx.lineTo(canvasCoords.x, canvasCoords.y);
+                        }
+                    }
+                }
+                
+                // Style de ligne
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+            
+            // Points individuels
             waypoints.forEach((point, index) => {
                 const canvasCoords = ROSToCanvas(point.x, point.y);
                 if (canvasCoords) {
-                    // Dessiner le point
+                    // Cercle extérieur
                     ctx.beginPath();
-                    ctx.arc(canvasCoords.x, canvasCoords.y, 5, 0, 2 * Math.PI);
-                    ctx.fillStyle = '#3b82f6';
+                    ctx.arc(canvasCoords.x, canvasCoords.y, 10, 0, 2 * Math.PI);
+                    
+                    // Point actif vs inactif
+                    if (demoRunning && index === currentWaypointIndex) {
+                        ctx.fillStyle = '#f97316'; // Orange pour le point actif
+                    } else if (demoRunning && index < currentWaypointIndex) {
+                        ctx.fillStyle = '#a3e635'; // Vert clair pour les points déjà atteints
+                    } else {
+                        ctx.fillStyle = '#3b82f6'; // Bleu par défaut
+                    }
+                    
                     ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
                     
                     // Numéro du point
-                    ctx.font = '12px Arial';
-                    ctx.fillStyle = '#1e40af';
-                    ctx.fillText(index + 1, canvasCoords.x + 8, canvasCoords.y + 4);
-                    
-                    // Ligne vers le point suivant
-                    if (index < waypoints.length - 1) {
-                        const nextCanvasCoords = ROSToCanvas(waypoints[index + 1].x, waypoints[index + 1].y);
-                        if (nextCanvasCoords) {
-                            ctx.beginPath();
-                            ctx.moveTo(canvasCoords.x, canvasCoords.y);
-                            ctx.lineTo(nextCanvasCoords.x, nextCanvasCoords.y);
-                            ctx.strokeStyle = '#3b82f6';
-                            ctx.setLineDash([5, 5]);
-                            ctx.stroke();
-                            ctx.setLineDash([]);
-                        }
-                    }
+                    ctx.font = 'bold 10px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(index + 1, canvasCoords.x, canvasCoords.y);
+                    ctx.textAlign = 'start';
+                    ctx.textBaseline = 'alphabetic';
                 }
             });
         }
 
-        // Mise à jour de la position du robot
-        // Remplacer la fonction updateRobotPosition existante par celle-ci:
-        function updateRobotPosition(pose) {
-            if (!currentMapData) return;
+        // Création des indicateurs visuels de waypoints
+        function updateWaypointIndicators() {
+            // Supprimer les indicateurs existants
+            removeWaypointIndicators();
+            
+            if (!currentMapData || !canvas.parentElement) return;
+            
+            // Créer de nouveaux indicateurs
+            waypoints.forEach((point, index) => {
+                const canvasCoords = ROSToCanvas(point.x, point.y);
+                if (canvasCoords) {
+                    // Créer un élément div pour l'indicateur
+                    const indicator = document.createElement('div');
+                    indicator.className = 'waypoint-indicator';
+                    
+                    // Ajouter la classe pour le point en cours
+                    if (demoRunning && index === currentWaypointIndex) {
+                        indicator.className += ' target-waypoint';
+                    } else if (demoRunning && index < currentWaypointIndex) {
+                        indicator.style.backgroundColor = '#84cc16'; // Vert pour les points atteints
+                    }
+                    
+                    indicator.textContent = index + 1;
+                    
+                    // Positionner l'indicateur
+                    indicator.style.left = `${canvasCoords.x - 12}px`;
+                    indicator.style.top = `${canvasCoords.y - 12}px`;
+                    
+                    // Ajouter au DOM
+                    canvas.parentElement.appendChild(indicator);
+                    waypointIndicators.push(indicator);
+                }
+            });
+        }
 
-            const canvasCoords = ROSToCanvas(pose.position.x, pose.position.y);
-            if (canvasCoords) {
-                // Sauvegarder l'état actuel du canvas
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                ctx.putImageData(imageData, 0, 0);
-                drawWaypoints();
-                
-                // Dessiner un cercle extérieur pour augmenter la visibilité (effet de halo)
-                ctx.beginPath();
-                ctx.arc(canvasCoords.x, canvasCoords.y, 16, 0, 2 * Math.PI);
-                ctx.fillStyle = 'rgba(239, 68, 68, 0.3)'; // Rouge semi-transparent
-                ctx.fill();
-                
-                // Robot - cercle plus grand et plus visible
-                ctx.beginPath();
-                ctx.arc(canvasCoords.x, canvasCoords.y, 12, 0, 2 * Math.PI);
-                ctx.fillStyle = '#ef4444'; // Rouge
-                ctx.fill();
-                ctx.strokeStyle = '#ffffff'; // Bordure blanche
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                // Direction - flèche plus prononcée
-                const angle = 2 * Math.atan2(pose.orientation.z, pose.orientation.w);
-                
-                // Dessiner une flèche directionnelle plus visible
-                const arrowLength = 25;
-                const arrowWidth = 8;
-                
-                // Ligne principale de la flèche
-                ctx.beginPath();
-                ctx.moveTo(canvasCoords.x, canvasCoords.y);
-                const endX = canvasCoords.x + Math.cos(angle) * arrowLength;
-                const endY = canvasCoords.y + Math.sin(angle) * arrowLength;
-                ctx.lineTo(endX, endY);
-                ctx.strokeStyle = '#ef4444';
-                ctx.lineWidth = 3;
-                ctx.stroke();
-                
-                // Pointe de la flèche
-                ctx.beginPath();
-                const angle1 = angle + Math.PI * 0.8;
-                const angle2 = angle - Math.PI * 0.8;
-                ctx.moveTo(endX, endY);
-                ctx.lineTo(
-                    endX - Math.cos(angle1) * arrowWidth,
-                    endY - Math.sin(angle1) * arrowWidth
-                );
-                ctx.lineTo(
-                    endX - Math.cos(angle2) * arrowWidth,
-                    endY - Math.sin(angle2) * arrowWidth
-                );
-                ctx.closePath();
-                ctx.fillStyle = '#ef4444';
-                ctx.fill();
-                
-                // Ajouter un texte "Robot" à côté
-                ctx.font = 'bold 12px Arial';
-                ctx.fillStyle = '#000000';
-                ctx.fillText('Robot', canvasCoords.x + 20, canvasCoords.y - 10);
-            }
+        function removeWaypointIndicators() {
+            waypointIndicators.forEach(indicator => {
+                if (indicator.parentElement) {
+                    indicator.parentElement.removeChild(indicator);
+                }
+            });
+            waypointIndicators = [];
         }
 
         // Navigation
@@ -695,7 +1072,179 @@
                 const waypoint = waypoints[currentWaypointIndex];
                 sendNavigationGoal(waypoint.x, waypoint.y);
                 addDebugLog(`Navigation vers le point ${currentWaypointIndex + 1}`);
+                updateWaypointsList(); // Mettre à jour la liste pour montrer le point actif
+                updateWaypointIndicators(); // Mettre à jour les indicateurs visuels
             }
+        }
+
+        // Configuration des interactions avec la carte (zoom, déplacement)
+        function setupMapInteractions() {
+            let isDragging = false;
+            let lastX = 0;
+            let lastY = 0;
+            
+            // Gestion du déplacement de la carte avec la souris
+            canvas.addEventListener('mousedown', function(e) {
+                if (!document.getElementById('addWaypoint').classList.contains('active')) {
+                    isDragging = true;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                    canvas.style.cursor = 'grabbing';
+                    
+                    // Marquer la transformation comme modifiée par l'utilisateur
+                    window.mapTransform.userModified = true;
+                    e.preventDefault();
+                }
+            });
+            
+            window.addEventListener('mouseup', function() {
+                isDragging = false;
+                if (!document.getElementById('addWaypoint').classList.contains('active')) {
+                    canvas.style.cursor = 'grab';
+                } else {
+                    canvas.style.cursor = 'crosshair';
+                }
+            });
+            
+            window.addEventListener('mousemove', function(e) {
+                if (!isDragging || !window.mapTransform) return;
+                
+                const dx = e.clientX - lastX;
+                const dy = e.clientY - lastY;
+                lastX = e.clientX;
+                lastY = e.clientY;
+                
+                // Mettre à jour la transformation
+                window.mapTransform.offsetX += dx;
+                window.mapTransform.offsetY += dy;
+                
+                // Redessiner
+                if (currentMapData) {
+                    drawMapOnly(currentMapData);
+                    drawWaypoints();
+                    if (robotPosition) {
+                        updateRobotPosition(robotPosition);
+                    }
+                }
+            });
+            
+            // Gestion du zoom avec la molette de la souris
+            canvas.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                
+                if (!window.mapTransform || !currentMapData) return;
+                
+                // Calculer le facteur de zoom basé sur la direction de la molette
+                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                
+                // Marquer la transformation comme modifiée par l'utilisateur
+                window.mapTransform.userModified = true;
+                
+                // Point d'origine du zoom (position de la souris)
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                // Ajuster la transformation pour zoomer vers la position de la souris
+                window.mapTransform.offsetX = mouseX - (mouseX - window.mapTransform.offsetX) * zoomFactor;
+                window.mapTransform.offsetY = mouseY - (mouseY - window.mapTransform.offsetY) * zoomFactor;
+                window.mapTransform.scale *= zoomFactor;
+                
+                // Limiter le zoom min et max
+                window.mapTransform.scale = Math.max(0.2, Math.min(window.mapTransform.scale, 5));
+                
+                // Redessiner
+                drawMapOnly(currentMapData);
+                drawWaypoints();
+                if (robotPosition) {
+                    updateRobotPosition(robotPosition);
+                }
+            });
+            
+            // Boutons de zoom
+            document.getElementById('zoomIn').addEventListener('click', function() {
+                if (!window.mapTransform || !currentMapData) return;
+                
+                // Marquer la transformation comme modifiée par l'utilisateur
+                window.mapTransform.userModified = true;
+                
+                // Calculer le centre du canvas
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                
+                // Zoomer sur le centre
+                window.mapTransform.offsetX = centerX - (centerX - window.mapTransform.offsetX) * 1.2;
+                window.mapTransform.offsetY = centerY - (centerY - window.mapTransform.offsetY) * 1.2;
+                window.mapTransform.scale *= 1.2;
+                
+                // Limiter le zoom max
+                window.mapTransform.scale = Math.min(window.mapTransform.scale, 5);
+                
+                // Redessiner
+                drawMapOnly(currentMapData);
+                drawWaypoints();
+                if (robotPosition) {
+                    updateRobotPosition(robotPosition);
+                }
+            });
+            
+            document.getElementById('zoomOut').addEventListener('click', function() {
+                if (!window.mapTransform || !currentMapData) return;
+                
+                // Marquer la transformation comme modifiée par l'utilisateur
+                window.mapTransform.userModified = true;
+                
+                // Calculer le centre du canvas
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                
+                // Dézoomer depuis le centre
+                window.mapTransform.offsetX = centerX - (centerX - window.mapTransform.offsetX) * 0.8;
+                window.mapTransform.offsetY = centerY - (centerY - window.mapTransform.offsetY) * 0.8;
+                window.mapTransform.scale *= 0.8;
+                
+                // Limiter le zoom min
+                window.mapTransform.scale = Math.max(0.2, window.mapTransform.scale);
+                
+                // Redessiner
+                drawMapOnly(currentMapData);
+                drawWaypoints();
+                if (robotPosition) {
+                    updateRobotPosition(robotPosition);
+                }
+            });
+            
+            document.getElementById('resetView').addEventListener('click', function() {
+                if (!currentMapData) return;
+                
+                // Réinitialiser la transformation
+                window.mapTransform.userModified = false;
+                
+                // Redessiner entièrement
+                drawMap(currentMapData);
+            });
+        }
+
+        // Ajuster la taille du canvas
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.offsetWidth - 20; // Marge de 10px de chaque côté
+            canvas.height = container.offsetHeight - 20;
+            
+            if (currentMapData) {
+                window.mapTransform.userModified = false;
+                drawMap(currentMapData);
+            }
+        }
+
+        // Fonction pour rafraîchir périodiquement l'affichage du robot
+        function setupAutoRefresh() {
+            setInterval(function() {
+                if (robotPosition && currentMapData) {
+                    // Mettre à jour la position du robot avec l'effet de pulsation
+                    updateRobotPosition(robotPosition);
+                }
+            }, 200); // Rafraîchir toutes les 200ms
         }
 
         // Événements
@@ -712,22 +1261,28 @@
             this.classList.toggle('active');
             if (this.classList.contains('active')) {
                 addDebugLog('Mode ajout de points activé - Cliquez sur la carte');
-                this.style.background = '#4ade80';
+                this.style.background = 'linear-gradient(135deg, #4ade80, #22c55e)';
+                canvas.style.cursor = 'crosshair';
             } else {
                 addDebugLog('Mode ajout de points désactivé');
                 this.style.background = '';
+                canvas.style.cursor = 'grab';
             }
         });
 
         document.getElementById('clearWaypoints').addEventListener('click', function() {
             waypoints = [];
             updateWaypointsList();
-            drawMap(currentMapData);
+            removeWaypointIndicators();
+            if (currentMapData) {
+                drawMap(currentMapData);
+            }
             addDebugLog('Points effacés');
+            
+            // Désactiver le bouton de démarrage
+            document.getElementById('startRoute').disabled = true;
         });
 
-        // Mise à jour du gestionnaire d'événement pour le bouton "Démarrer la navigation"
-        // Par ces deux gestionnaires d'événements
         document.getElementById('initNavigation').addEventListener('click', function() {
             if (!demoRunning) {
                 // Appeler le service pour démarrer la navigation
@@ -745,13 +1300,16 @@
                     if (result.success) {
                         addDebugLog('Navigation initialisée: ' + result.message);
                         
-                        // Activer le bouton de démarrage du parcours
-                        document.getElementById('startRoute').disabled = false;
+                        // Activer le bouton de démarrage du parcours si des points sont définis
+                        document.getElementById('startRoute').disabled = waypoints.length === 0;
                         // Désactiver ce bouton pour éviter de relancer
                         document.getElementById('initNavigation').disabled = true;
                     } else {
                         addDebugLog('Erreur: ' + result.message);
                     }
+                }, function(error) {
+                    addDebugLog('Erreur de service: Vérifiez que le service existe');
+                    console.error(error);
                 });
             }
         });
@@ -771,10 +1329,17 @@
             document.getElementById('startRoute').disabled = true;
             document.getElementById('pauseDemo').disabled = false;
             document.getElementById('stopDemo').disabled = false;
+            document.getElementById('addWaypoint').classList.remove('active');
+            document.getElementById('addWaypoint').style.background = '';
+            canvas.style.cursor = 'grab';
+            
+            // Mise à jour de l'affichage
+            updateWaypointsList();
+            updateWaypointIndicators();
         });
 
         document.getElementById('pauseDemo').addEventListener('click', function() {
-        if (demoRunning) {
+            if (demoRunning) {
                 demoPaused = !demoPaused;
                 addDebugLog(demoPaused ? 'Parcours en pause' : 'Reprise du parcours');
                 
@@ -791,7 +1356,6 @@
             }
         });
 
-        // Mise à jour du gestionnaire d'événement pour le bouton "Arrêter"
         document.getElementById('stopDemo').addEventListener('click', function() {
             if (demoRunning) {
                 demoRunning = false;
@@ -815,6 +1379,25 @@
                     } else {
                         addDebugLog('Erreur lors de l\'arrêt: ' + result.message);
                     }
+                }, function(error) {
+                    addDebugLog('Erreur de service: Vérifiez que le service existe');
+                    console.error(error);
+                    
+                    // On arrête quand même le robot même si le service échoue
+                    if (ros) {
+                        const cmdVel = new ROSLIB.Topic({
+                            ros: ros,
+                            name: '/cmd_vel',
+                            messageType: 'geometry_msgs/Twist'
+                        });
+                        
+                        const twist = new ROSLIB.Message({
+                            linear: { x: 0, y: 0, z: 0 },
+                            angular: { x: 0, y: 0, z: 0 }
+                        });
+                        cmdVel.publish(twist);
+                        addDebugLog('Robot arrêté');
+                    }
                 });
                 
                 // Arrêter le robot
@@ -834,40 +1417,53 @@
                 }
 
                 // Réinitialisation des boutons
-                document.getElementById('startRoute').disabled = false;
+                document.getElementById('startRoute').disabled = waypoints.length === 0;
                 document.getElementById('pauseDemo').disabled = true;
                 document.getElementById('stopDemo').disabled = true;
+                document.getElementById('pauseDemo').innerHTML = '<i class="fas fa-pause"></i> Pause';
+                
+                // Mise à jour de l'affichage
+                updateWaypointsList();
+                updateWaypointIndicators();
+                if (currentMapData) {
+                    drawMap(currentMapData);
+                }
             }
         });
 
         // Initialisation
         window.addEventListener('load', function() {
+            // Connexion à ROS
             connectToROS();
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
+            
+            // Initialisation du canvas
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
             
             // Initialisation des états des boutons
             document.getElementById('startRoute').disabled = true;
             document.getElementById('pauseDemo').disabled = true;
             document.getElementById('stopDemo').disabled = true;
             
+            // Configurer les interactions avec la carte
+            setupMapInteractions();
+            
+            // Configurer le rafraîchissement automatique
+            setupAutoRefresh();
+            
             // Vérifier si la navigation est déjà en cours
-            if (ros) {
-                ros.getNodes(function(nodes) {
-                    if (nodes.indexOf('/move_base') !== -1) {
-                        // La navigation est déjà en cours
-                        document.getElementById('initNavigation').disabled = true;
-                        document.getElementById('startRoute').disabled = false;
-                        addDebugLog('Navigation déjà initialisée');
-                    }
-                });
-            }
-        });
-
-        window.addEventListener('resize', function() {
-            if (currentMapData) {
-                drawMap(currentMapData);
-            }
+            setTimeout(function() {
+                if (ros) {
+                    ros.getNodes(function(nodes) {
+                        if (nodes.indexOf('/move_base') !== -1) {
+                            // La navigation est déjà en cours
+                            document.getElementById('initNavigation').disabled = true;
+                            document.getElementById('startRoute').disabled = waypoints.length === 0;
+                            addDebugLog('Navigation déjà initialisée');
+                        }
+                    });
+                }
+            }, 2000); // Attendre 2 secondes pour laisser le temps à ROS de se connecter
         });
     </script>
 </body>

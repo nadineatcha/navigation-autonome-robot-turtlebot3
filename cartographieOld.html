@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartographie TurtleBot3</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/roslibjs/1.1.0/roslib.min.js"></script>
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #2563eb, #1e40af);
+            --secondary-gradient: linear-gradient(135deg, #3b82f6, #2563eb);
+            --text-color: #1f2937;
+            --light-bg: #f8fafc;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            background-color: #f0f4f8;
+            color: var(--text-color);
+        }
+
+        .nav-menu {
+            background: var(--primary-gradient);
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+
+        .header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 2rem 1rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .mapping-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 2rem;
+        }
+
+        .map-view {
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            padding: 1rem;
+            min-height: 600px;
+        }
+
+        .controls-panel {
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+        }
+
+        .status {
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            background-color: #f87171;
+            color: #7f1d1d;
+            transition: all 0.3s ease;
+        }
+
+        .connected {
+            background-color: #4ade80;
+            color: #064e3b;
+        }
+
+        .control-button {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary-gradient);
+            color: white;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .control-button:active {
+            transform: translateY(0);
+        }
+
+        .debug-info {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--light-bg);
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .map-canvas {
+            width: 100%;
+            height: 600px;
+            background: #eee;
+            border-radius: 8px;
+        }
+
+        @media (max-width: 1024px) {
+            .mapping-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .map-view {
+                min-height: 400px;
+            }
+            
+            .map-canvas {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-menu">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <a href="index.html" style="color: white; text-decoration: none;">
+                    <i class="fas fa-robot"></i> TurtleBot3
+                </a>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Accueil</a>
+                <a href="controle.html">Contrôle</a>
+                <a href="cartographie.html">Cartographie</a>
+                <a href="navigation.html">Navigation</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="header">
+        <h1>Cartographie TurtleBot3</h1>
+        <p>Création et visualisation de cartes avec SLAM</p>
+    </header>
+
+    <div class="mapping-container">
+        <div class="map-view">
+            <canvas id="mapCanvas" class="map-canvas"></canvas>
+        </div>
+
+        <div class="controls-panel">
+            <div id="status" class="status">Déconnecté</div>
+            
+            <button id="startMapping" class="control-button">
+                <i class="fas fa-play"></i> Démarrer SLAM
+            </button>
+            
+            <button id="stopMapping" class="control-button">
+                <i class="fas fa-stop"></i> Arrêter SLAM
+            </button>
+            
+            <button id="saveMap" class="control-button">
+                <i class="fas fa-save"></i> Sauvegarder la carte
+            </button>
+
+            <div class="debug-info" id="debug-log">
+                Logs de débogage...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let mapResolution = 0.05;
+        let mapOrigin = { x: 0, y: 0 };
+        let currentMapData = null;
+        let robotPosition = null;
+
+        function addDebugLog(message) {
+            const debugLog = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.innerHTML = `[${timestamp}] ${message}<br>` + debugLog.innerHTML;
+        }
+
+        // Connexion à ROS avec retry
+        function connectToROS() {
+            var ros = new ROSLIB.Ros({
+                url: 'ws://localhost:9090'
+            });
+
+            ros.on('connection', function() {
+                console.log('Connecté à ROS');
+                addDebugLog('Connecté à ROS');
+                document.getElementById('status').textContent = 'Connecté';
+                document.getElementById('status').classList.add('connected');
+            });
+
+            ros.on('error', function(error) {
+                console.log('Erreur de connexion:', error);
+                addDebugLog('Erreur de connexion, nouvelle tentative dans 3s...');
+                document.getElementById('status').textContent = 'Erreur de connexion';
+                document.getElementById('status').classList.remove('connected');
+                setTimeout(connectToROS, 3000);
+            });
+
+            ros.on('close', function() {
+                console.log('Connexion fermée');
+                addDebugLog('Connexion fermée, nouvelle tentative dans 3s...');
+                document.getElementById('status').textContent = 'Déconnecté';
+                document.getElementById('status').classList.remove('connected');
+                setTimeout(connectToROS, 3000);
+            });
+
+            return ros;
+        }
+
+        const ros = connectToROS();
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Conversion des coordonnées ROS vers le canvas
+        // Mise à jour de la fonction ROSToCanvas pour utiliser la transformation stockée
+        function ROSToCanvas(rosX, rosY) {
+            if (!currentMapData || !window.mapTransform) return null;
+            
+            // Convertir de ROS vers la carte
+            const mapX = (rosX - mapOrigin.x) / mapResolution;
+            const mapY = (rosY - mapOrigin.y) / mapResolution;
+            
+            // Appliquer la transformation stockée
+            const canvasX = window.mapTransform.offsetX + mapX * window.mapTransform.scale;
+            const canvasY = window.mapTransform.offsetY + mapY * window.mapTransform.scale;
+            
+            return { x: canvasX, y: canvasY };
+        }
+
+        // Mise à jour de la fonction pour afficher le robot de façon plus visible
+function updateRobotPosition(pose) {
+    if (!currentMapData || !window.mapTransform) return;
+
+    const canvasCoords = ROSToCanvas(pose.position.x, pose.position.y);
+    if (!canvasCoords) return;
+    
+    // Dessiner uniquement le robot (sans redessiner la carte)
+    // pour éviter le scintillement
+    
+    // Effet de pulsation pour mettre en évidence le robot
+    const now = Date.now();
+    const pulseSize = 1 + 0.2 * Math.sin(now / 200); // Pulsation douce
+    
+    // Cercle de contour extérieur avec lueur
+    ctx.beginPath();
+    ctx.arc(canvasCoords.x, canvasCoords.y, 20 * pulseSize, 0, 2 * Math.PI);
+    const gradient = ctx.createRadialGradient(
+        canvasCoords.x, canvasCoords.y, 5,
+        canvasCoords.x, canvasCoords.y, 20 * pulseSize
+    );
+    gradient.addColorStop(0, 'rgba(255, 100, 100, 0.7)');
+    gradient.addColorStop(1, 'rgba(255, 100, 100, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    
+    // Robot principal - cercle rouge
+    ctx.beginPath();
+    ctx.arc(canvasCoords.x, canvasCoords.y, 12, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(255, 50, 50, 0.9)';
+    ctx.fill();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Cercle intérieur pour texture
+    ctx.beginPath();
+    ctx.arc(canvasCoords.x, canvasCoords.y, 6, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(200, 0, 0, 1)';
+    ctx.fill();
+    
+    // Direction - flèche plus élaborée
+    const angle = 2 * Math.atan2(pose.orientation.z, pose.orientation.w);
+    
+    // Flèche de direction
+    const arrowLength = 30;
+    ctx.save();
+    ctx.translate(canvasCoords.x, canvasCoords.y);
+    ctx.rotate(angle);
+    
+    // Dessiner une flèche triangulaire
+    ctx.beginPath();
+    ctx.moveTo(12, 0); // Départ depuis le bord du cercle
+    ctx.lineTo(arrowLength, -8);
+    ctx.lineTo(arrowLength + 5, 0);
+    ctx.lineTo(arrowLength, 8);
+    ctx.closePath();
+    
+    // Gradient pour la flèche
+    const arrowGradient = ctx.createLinearGradient(12, 0, arrowLength, 0);
+    arrowGradient.addColorStop(0, 'rgba(255, 0, 0, 1)');
+    arrowGradient.addColorStop(1, 'rgba(255, 150, 150, 1)');
+    ctx.fillStyle = arrowGradient;
+    ctx.fill();
+    
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    
+    ctx.restore();
+    
+    // Étiquette "Robot"
+    ctx.save();
+    // Créer un fond arrondi pour le texte "Robot"
+    const label = "Robot";
+    ctx.font = 'bold 14px Arial';
+    const textWidth = ctx.measureText(label).width;
+    
+    // Position décalée pour ne pas couvrir le robot
+    const labelX = canvasCoords.x + 20;
+    const labelY = canvasCoords.y - 20;
+    
+    // Fond blanc semi-transparent avec bordure
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(labelX - 5, labelY - 14, textWidth + 10, 20, 5);
+    ctx.fill();
+    
+    ctx.strokeStyle = 'rgba(100, 100, 100, 0.8)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    
+    // Texte
+    ctx.fillStyle = 'rgba(200, 0, 0, 1)';
+    ctx.fillText(label, labelX, labelY);
+    ctx.restore();
+    
+    // Afficher les coordonnées (optionnel)
+    const coordsText = `(${pose.position.x.toFixed(2)}, ${pose.position.y.toFixed(2)})`;
+    ctx.font = '12px Arial';
+    ctx.fillStyle = 'black';
+    ctx.fillText(coordsText, canvasCoords.x + 20, canvasCoords.y + 20);
+}
+
+        // Configuration des souscriptions ROS pour la position du robot
+        function setupRobotPositionSubscriber() {
+            // Souscription à la position du robot (mode navigation)
+            const poseListener = new ROSLIB.Topic({
+                ros: ros,
+                name: '/amcl_pose',
+                messageType: 'geometry_msgs/PoseWithCovarianceStamped'
+            });
+
+            poseListener.subscribe(function(message) {
+                robotPosition = message.pose.pose;
+                addDebugLog("Position du robot mise à jour (AMCL)");
+                updateRobotPosition(robotPosition);
+            });
+            
+            // Souscription alternative pour le mode SLAM où /amcl_pose n'est pas disponible
+            const slamPoseListener = new ROSLIB.Topic({
+                ros: ros,
+                name: '/tf',
+                messageType: 'tf2_msgs/TFMessage'
+            });
+            
+            slamPoseListener.subscribe(function(message) {
+                // Rechercher les transformations base_footprint -> map
+                for (let i = 0; i < message.transforms.length; i++) {
+                    const transform = message.transforms[i];
+                    if (transform.header.frame_id === 'map' && 
+                        transform.child_frame_id === 'base_footprint') {
+                        
+                        const pose = {
+                            position: transform.transform.translation,
+                            orientation: transform.transform.rotation
+                        };
+                        
+                        robotPosition = pose;
+                        addDebugLog("Position du robot mise à jour (TF)");
+                        updateRobotPosition(pose);
+                        break;
+                    }
+                }
+            });
+        }
+
+        // Ajuster la taille du canvas
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            if (currentMapData) {
+                drawMap(currentMapData);
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Fonction pour dessiner uniquement la carte (sans le robot)
+        function drawMapOnly(mapData) {
+        // Récupérer les dimensions et échelles
+        const mapWidth = mapData.info.width;
+        const mapHeight = mapData.info.height;
+        
+        // Nettoyer le canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Calculer l'échelle pour faire tenir la carte dans le canvas avec une marge
+        const margin = 20; // marge en pixels
+        const scaleX = (canvas.width - 2 * margin) / mapWidth;
+        const scaleY = (canvas.height - 2 * margin) / mapHeight;
+        const scale = Math.min(scaleX, scaleY);
+        
+        // Position centrée
+        const offsetX = Math.floor((canvas.width - mapWidth * scale) / 2);
+        const offsetY = Math.floor((canvas.height - mapHeight * scale) / 2);
+        
+        // Créer une imageData pour la carte
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = mapWidth;
+        tempCanvas.height = mapHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        const imageData = tempCtx.createImageData(mapWidth, mapHeight);
+        const data = imageData.data;
+        
+        // Amélioration des couleurs pour un meilleur contraste
+        for (let i = 0; i < mapData.data.length; i++) {
+            const val = mapData.data[i];
+            const idx = i * 4;
+            
+            if (val === -1) { // Inconnu
+                data[idx] = 180;     // R
+                data[idx + 1] = 180; // G
+                data[idx + 2] = 180; // B
+                data[idx + 3] = 255; // A
+            } else if (val === 100) { // Occupé (obstacles)
+                data[idx] = 0;       // R
+                data[idx + 1] = 0;   // G
+                data[idx + 2] = 0;   // B
+                data[idx + 3] = 255; // A
+            } else if (val >= 0 && val < 50) { // Probablement libre (gradient de blanc à bleu clair)
+                const blueIntensity = Math.floor(200 - val * 4);
+                data[idx] = 240;     // R
+                data[idx + 1] = 250; // G
+                data[idx + 2] = 255; // B
+                data[idx + 3] = 255; // A
+            } else { // Entre 50-99: probabilité d'occupation (gradient de bleu clair à gris)
+                const intensity = Math.floor(200 - (val - 50) * 2);
+                data[idx] = intensity;     // R
+                data[idx + 1] = intensity; // G
+                data[idx + 2] = 240;       // B (plus bleu)
+                data[idx + 3] = 255;       // A
+            }
+        }
+        
+        // Mettre l'image sur le canvas temporaire
+        tempCtx.putImageData(imageData, 0, 0);
+        
+        // Dessiner l'image mise à l'échelle sur le canvas principal
+        ctx.imageSmoothingEnabled = false; // Désactiver le lissage pour un rendu plus net
+        ctx.drawImage(
+            tempCanvas,
+            0, 0, mapWidth, mapHeight,
+            offsetX, offsetY, mapWidth * scale, mapHeight * scale
+        );
+        
+        // Dessiner une grille pour aider à visualiser l'échelle (optionnel)
+        const gridSize = 10; // en unités de carte (mètres si resolution=0.05)
+        const gridSpacing = gridSize / mapResolution * scale;
+        
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(200, 200, 200, 0.5)";
+        ctx.lineWidth = 0.5;
+        
+        // Lignes verticales
+        for (let x = 0; x <= mapWidth; x += gridSize / mapResolution) {
+            const posX = offsetX + x * scale;
+            ctx.moveTo(posX, offsetY);
+            ctx.lineTo(posX, offsetY + mapHeight * scale);
+        }
+        
+        // Lignes horizontales
+        for (let y = 0; y <= mapHeight; y += gridSize / mapResolution) {
+            const posY = offsetY + y * scale;
+            ctx.moveTo(offsetX, posY);
+            ctx.lineTo(offsetX + mapWidth * scale, posY);
+        }
+        ctx.stroke();
+        
+        // Dessiner une bordure autour de la carte
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(offsetX, offsetY, mapWidth * scale, mapHeight * scale);
+        
+        // Stocker les infos de transformation pour utilisation dans d'autres fonctions
+        window.mapTransform = {
+            offsetX: offsetX,
+            offsetY: offsetY,
+            scale: scale
+        };
+        
+        return { offsetX, offsetY, scale };
+    }
+
+        // Fonction principale pour dessiner la carte et mettre à jour les variables globales
+        function drawMap(mapData) {
+        // Mettre à jour les variables globales
+        currentMapData = mapData;
+        mapResolution = mapData.info.resolution;
+        mapOrigin = {
+            x: mapData.info.origin.position.x,
+            y: mapData.info.origin.position.y
+        };
+        
+        // Dessiner la carte
+        const transform = drawMapOnly(mapData);
+        
+        // Ajouter une légende dans le coin
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.fillRect(transform.offsetX + 10, transform.offsetY + 10, 150, 80);
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.strokeRect(transform.offsetX + 10, transform.offsetY + 10, 150, 80);
+        
+        ctx.font = "12px Arial";
+        ctx.fillStyle = "black";
+        ctx.fillText("Légende:", transform.offsetX + 20, transform.offsetY + 30);
+        
+        // Obstacles
+        ctx.fillStyle = "black";
+        ctx.fillRect(transform.offsetX + 20, transform.offsetY + 40, 20, 10);
+        ctx.fillStyle = "black";
+        ctx.fillText("Obstacle", transform.offsetX + 50, transform.offsetY + 50);
+        
+        // Espace libre
+        ctx.fillStyle = "rgb(240, 250, 255)";
+        ctx.fillRect(transform.offsetX + 20, transform.offsetY + 60, 20, 10);
+        ctx.fillStyle = "black";
+        ctx.fillText("Espace libre", transform.offsetX + 50, transform.offsetY + 70);
+        
+        // Ajouter une échelle
+        const meterSize = 1 / mapResolution * transform.scale; // taille d'1m en pixels
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.fillRect(transform.offsetX + transform.scale * mapData.info.width - 110, transform.offsetY + 10, 100, 30);
+        
+        ctx.beginPath();
+        ctx.moveTo(transform.offsetX + transform.scale * mapData.info.width - 100, transform.offsetY + 30);
+        ctx.lineTo(transform.offsetX + transform.scale * mapData.info.width - 100 + meterSize, transform.offsetY + 30);
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        ctx.font = "10px Arial";
+        ctx.fillStyle = "black";
+        ctx.fillText("1 mètre", transform.offsetX + transform.scale * mapData.info.width - 100 + meterSize/2 - 20, transform.offsetY + 25);
+        
+        // Si on a déjà la position du robot, la redessiner
+        if (robotPosition) {
+            updateRobotPosition(robotPosition);
+        }
+        
+        addDebugLog(`Carte mise à jour: ${mapData.info.width}x${mapData.info.height}`);
+    }
+
+
+    // Fonction pour gérer le zoom et le déplacement de la carte
+function setupMapInteractions() {
+    let isDragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let currentZoom = 1;
+    let initialTransform = { offsetX: 0, offsetY: 0, scale: 1 };
+    
+    // Gestionnaire pour le clic de souris
+    canvas.addEventListener('mousedown', function(e) {
+        isDragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        canvas.style.cursor = 'grabbing';
+        
+        // Sauvegarder la transformation initiale
+        if (window.mapTransform) {
+            initialTransform = { ...window.mapTransform };
+        }
+    });
+    
+    // Gestionnaire pour le relâchement de souris
+    window.addEventListener('mouseup', function() {
+        isDragging = false;
+        canvas.style.cursor = 'default';
+    });
+    
+    // Gestionnaire pour le mouvement de souris
+    window.addEventListener('mousemove', function(e) {
+        if (!isDragging || !window.mapTransform) return;
+        
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        
+        // Mettre à jour la transformation
+        window.mapTransform.offsetX += dx;
+        window.mapTransform.offsetY += dy;
+        
+        // Redessiner si nous avons les données de la carte
+        if (currentMapData) {
+            drawMapOnly(currentMapData);
+            
+            // Redessiner le robot si on a sa position
+            if (robotPosition) {
+                updateRobotPosition(robotPosition);
+            }
+        }
+    });
+    
+    // Gestionnaire pour la molette de la souris (zoom)
+    canvas.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        
+        if (!window.mapTransform || !currentMapData) return;
+        
+        // Calculer le facteur de zoom basé sur la direction de la molette
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        currentZoom *= zoomFactor;
+        
+        // Limiter le zoom min et max
+        currentZoom = Math.max(0.5, Math.min(currentZoom, 5));
+        
+        // Point d'origine du zoom (position de la souris)
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        // Ajuster la transformation pour zoomer vers la position de la souris
+        window.mapTransform.offsetX = mouseX - (mouseX - window.mapTransform.offsetX) * zoomFactor;
+        window.mapTransform.offsetY = mouseY - (mouseY - window.mapTransform.offsetY) * zoomFactor;
+        window.mapTransform.scale *= zoomFactor;
+        
+        // Redessiner avec la nouvelle transformation
+        drawMapOnly(currentMapData);
+        
+        // Redessiner le robot si on a sa position
+        if (robotPosition) {
+            updateRobotPosition(robotPosition);
+        }
+    });
+    
+    // Boutons de contrôle du zoom
+    const zoomControlsContainer = document.createElement('div');
+    zoomControlsContainer.style.position = 'absolute';
+    zoomControlsContainer.style.top = '10px';
+    zoomControlsContainer.style.right = '10px';
+    zoomControlsContainer.style.zIndex = '10';
+    
+    // Bouton Zoom +
+    const zoomInButton = document.createElement('button');
+    zoomInButton.innerHTML = '<i class="fas fa-plus"></i>';
+    zoomInButton.style.width = '30px';
+    zoomInButton.style.height = '30px';
+    zoomInButton.style.marginRight = '5px';
+    zoomInButton.style.borderRadius = '4px';
+    zoomInButton.style.cursor = 'pointer';
+    
+    // Bouton Zoom -
+    const zoomOutButton = document.createElement('button');
+    zoomOutButton.innerHTML = '<i class="fas fa-minus"></i>';
+    zoomOutButton.style.width = '30px';
+    zoomOutButton.style.height = '30px';
+    zoomOutButton.style.marginRight = '5px';
+    zoomOutButton.style.borderRadius = '4px';
+    zoomOutButton.style.cursor = 'pointer';
+    
+    // Bouton Reset
+    const resetButton = document.createElement('button');
+    resetButton.innerHTML = '<i class="fas fa-home"></i>';
+    resetButton.style.width = '30px';
+    resetButton.style.height = '30px';
+    resetButton.style.borderRadius = '4px';
+    resetButton.style.cursor = 'pointer';
+    
+    // Ajouter les boutons au conteneur
+    zoomControlsContainer.appendChild(zoomInButton);
+    zoomControlsContainer.appendChild(zoomOutButton);
+    zoomControlsContainer.appendChild(resetButton);
+    
+    // Ajouter le conteneur au parent du canvas
+    canvas.parentElement.style.position = 'relative';
+    canvas.parentElement.appendChild(zoomControlsContainer);
+    
+    // Gestionnaires d'événements pour les boutons
+    zoomInButton.addEventListener('click', function() {
+        currentZoom *= 1.2;
+        currentZoom = Math.min(currentZoom, 5);
+        window.mapTransform.scale = initialTransform.scale * currentZoom;
+        
+        // Centrer le zoom
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        window.mapTransform.offsetX = centerX - (centerX - initialTransform.offsetX) * currentZoom;
+        window.mapTransform.offsetY = centerY - (centerY - initialTransform.offsetY) * currentZoom;
+        
+        if (currentMapData) {
+            drawMapOnly(currentMapData);
+            if (robotPosition) updateRobotPosition(robotPosition);
+        }
+    });
+    
+    zoomOutButton.addEventListener('click', function() {
+        currentZoom *= 0.8;
+        currentZoom = Math.max(currentZoom, 0.5);
+        window.mapTransform.scale = initialTransform.scale * currentZoom;
+        
+        // Centrer le zoom
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        window.mapTransform.offsetX = centerX - (centerX - initialTransform.offsetX) * currentZoom;
+        window.mapTransform.offsetY = centerY - (centerY - initialTransform.offsetY) * currentZoom;
+        
+        if (currentMapData) {
+            drawMapOnly(currentMapData);
+            if (robotPosition) updateRobotPosition(robotPosition);
+        }
+    });
+    
+    resetButton.addEventListener('click', function() {
+        currentZoom = 1;
+        if (currentMapData) {
+            // Redessiner complètement la carte (ce qui rétablit les transformations par défaut)
+            drawMap(currentMapData);
+            initialTransform = { ...window.mapTransform };
+        }
+    });
+}
+
+// Fonction pour rafraîchir périodiquement l'affichage du robot
+function setupAutoRefresh() {
+    setInterval(function() {
+        if (robotPosition && currentMapData) {
+            // Redessiner uniquement le robot (par-dessus la carte)
+            // pour créer l'effet de pulsation
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Restaurer l'état de la carte
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Redessiner le robot avec effet de pulsation
+            updateRobotPosition(robotPosition);
+        }
+    }, 100); // Rafraîchir toutes les 100ms
+}
+
+// Appeler cette fonction après le chargement du document
+window.addEventListener('load', function() {
+    // Initialisation existante...
+    
+    // Ajouter les interactions de carte
+    setupMapInteractions();
+    
+    // Configurer le rafraîchissement automatique
+    setupAutoRefresh();
+});
+    </script>
+</body>
+</html>
