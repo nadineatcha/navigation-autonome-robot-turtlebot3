@@ -57,7 +57,7 @@ show_separator "WEBSOCKET est maintenant actif et fonctionnel!"
 
 # Lancement du SLAM
 echo "🗺️  Lancement du SLAM..."
-roslaunch turtlebot3_slam turtlebot3_slam.launch &
+roslaunch turtlebot3_slam turtlebot3_slam.launch open_rviz:=false &
 slam_pid=$!
 sleep 3
 show_separator "SLAM est maintenant actif et fonctionnel!"

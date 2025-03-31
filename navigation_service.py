@@ -37,7 +37,7 @@ def handle_start_navigation(req):
         
         # Lancer navigation avec la carte la plus récente en utilisant le chemin absolu
         cmd = ["roslaunch", "turtlebot3_navigation", "turtlebot3_navigation.launch", 
-               f"map_file:={latest_map}", "initial_pose_x:=0.0", "initial_pose_y:=0.0", "initial_pose_a:=0.0", "open_rviz:=true"]
+               f"map_file:={latest_map}", "initial_pose_x:=0.0", "initial_pose_y:=0.0", "initial_pose_a:=0.0"]
         
         subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
