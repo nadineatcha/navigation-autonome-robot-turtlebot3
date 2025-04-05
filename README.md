@@ -1,228 +1,176 @@
-Manuel Utilisateur - Plateforme de Navigation TurtleBot3
+# 🤖 Plateforme de Navigation TurtleBot3
 
-Sommaire
-Introduction
+Une interface web complète pour le contrôle, la cartographie et la navigation autonome des robots TurtleBot3, utilisant ROS Noetic.
 
+![TurtleBot3](https://raw.githubusercontent.com/ROBOTIS-GIT/emanual/master/assets/images/platform/turtlebot3/logo_turtlebot3.png)
 
-Configuration initiale
+## 📋 Table des Matières
 
+- [À propos](#à-propos)
+- [Fonctionnalités](#fonctionnalités)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Utilisation](#utilisation)
+- [Services](#services)
+- [Dépannage](#dépannage)
+- [Contribution](#contribution)
+- [Licence](#licence)
+- [Contact](#contact)
 
-Prérequis
+## 🔍 À propos
 
+Cette plateforme offre une solution complète pour piloter et automatiser des robots TurtleBot3, rendant accessibles les technologies robotiques avancées sans nécessiter de connaissances techniques approfondies. Le système combine une interface web intuitive avec des services backend robustes pour permettre un contrôle précis, une cartographie efficace et une navigation autonome.
 
-Installation sur le TurtleBot3
+## ✨ Fonctionnalités
 
+### 🎮 Contrôle à Distance
+- Interface web intuitive pour piloter manuellement le robot
+- Contrôle précis avec retour d'état en temps réel
+- Compatible avec tous les navigateurs modernes
 
-Installation sur le PC distant
+### 🗺️ Cartographie 
+- Génération automatique de cartes détaillées de l'environnement via SLAM
+- Visualisation en temps réel de la carte en cours de création
+- Sauvegarde automatique des cartes avec horodatage
 
+### 🧭 Navigation Autonome
+- Définition de points de passage par simple clic sur la carte
+- Planification automatique des trajectoires optimisées
+- Fonctionnalités de pause, reprise et arrêt d'urgence
+- Visualisation en temps réel du parcours et de la position du robot
 
-Fonctionnalités principales
+## 🏛️ Architecture
 
+Le système repose sur une architecture client-serveur :
 
-Contrôle à distance
+- **Frontend** : Interface utilisateur responsive en HTML/CSS/JavaScript
+- **Communication** : WebSockets via rosbridge pour une communication bidirectionnelle en temps réel
+- **Backend** : Services ROS en Python et scripts bash pour l'automatisation
+- **Framework** : ROS Noetic pour la communication inter-processus robotique
 
+## 💻 Installation
 
-Cartographie
+### Prérequis
 
+- Ubuntu 20.04
+- ROS Noetic
+- TurtleBot3 (réel ou simulé avec Gazebo)
+- Node.js et npm (pour le développement frontend)
+- Python 3.8+
 
-Navigation autonome
+### Installation sur le PC de contrôle
 
+```bash
+# Cloner le dépôt
+git clone https://github.com/votre-username/turtlebot3-nav-platform.git
+cd turtlebot3-nav-platform
 
-Guide d'utilisation détaillé
+# Installer les dépendances ROS
+sudo apt-get update
+sudo apt-get install -y ros-noetic-rosbridge-server
+sudo apt-get install -y ros-noetic-turtlebot3-*
 
+# Configurer le workspace
+mkdir -p ~/catkin_ws/src
+cd ~/catkin_ws/src
+cp -r ~/turtlebot3-nav-platform/* .
+cd ..
+catkin_make
 
-Démarrage du système
+# Rendre les scripts exécutables
+chmod +x ~/catkin_ws/src/scripts/*.sh
+chmod +x ~/catkin_ws/src/scripts/*.py
+```
 
+### Configuration sur le TurtleBot3
 
-Interface de contrôle manuel
+```bash
+# Sur le robot TurtleBot3
+ssh ubuntu@<IP-DU-TURTLEBOT>
 
+# Copier le script de démarrage
+scp ~/catkin_ws/src/scripts/en_lancer_robot_sur_turtlebot.sh ubuntu@<IP-DU-TURTLEBOT>:~/
 
-Création et sauvegarde d'une carte
-
-
-Configuration et exécution d'un parcours autonome
-
-
-Résolution de problèmes
-
-
-Informations techniques
-
-
-
-1. Introduction
-La plateforme de navigation TurtleBot3 est une solution complète pour le contrôle, la cartographie et la navigation autonome de robots mobiles TurtleBot3. Cette documentation vous guide à travers l'installation et l'utilisation de l'interface web intuitive qui vous permet de :
-Contrôler manuellement votre robot TurtleBot3
-
-
-Générer et sauvegarder des cartes détaillées de l'environnement
-
-
-Configurer et exécuter des parcours de navigation autonome
-
-
-Cette solution est conçue pour être accessible aux utilisateurs sans connaissances techniques avancées en robotique.
-
-2. Configuration initiale
-2.1 Prérequis
-TurtleBot3 (modèle Burger recommandé)
-
-
-PC distant sous Ubuntu 20.04 avec ROS Noetic installé
-
-
-Réseau WiFi commun entre le PC distant et le TurtleBot3
-
-
-2.2 Installation sur le TurtleBot3
-Copiez le script en_lancer_robot_sur_turtlebot.sh sur votre TurtleBot3 (ex: /home/ubuntu/).
-Rendez le script exécutable :
- chmod +x /home/ubuntu/en_lancer_robot_sur_turtlebot.sh
-
-Pour que le TurtleBot3 démarre automatiquement, copiez le fichier de service :
- sudo cp turtlebot_startup.service /etc/systemd/system/
-
-
+# Configurer le service systemd
+sudo cp ~/catkin_ws/src/config/turtlebot_startup.service /etc/systemd/system/
 sudo systemctl enable turtlebot_startup.service
+sudo systemctl start turtlebot_startup.service
+```
 
-Démarrez le service :
- sudo systemctl start turtlebot_startup.service
+## 🚀 Utilisation
 
+### Démarrer le système sur le PC de contrôle
 
-2.3 Installation sur le PC distant
-Assurez-vous que ROS Noetic est installé et que votre workspace catkin est configuré.
+```bash
+# Configurer l'environnement ROS
+export TURTLEBOT3_MODEL=burger  # ou waffle ou waffle_pi selon votre modèle
 
+# Lancer la plateforme
+cd ~/catkin_ws
+./src/scripts/en_lancer_robot_sur_pc_distant.sh
+```
 
-Copiez les fichiers suivants dans votre répertoire personnel :
+### Accéder à l'interface web
 
+Ouvrez votre navigateur et accédez à :
+```
+http://localhost:8000
+```
 
-en_lancer_robot_sur_pc_distant.sh
+### Utilisation de l'interface
 
+1. **Page d'accueil** : Vue d'ensemble des fonctionnalités disponibles
+2. **Contrôle** : Pilotage manuel du robot avec les flèches directionnelles
+3. **Cartographie** : Création et sauvegarde de cartes de l'environnement
+4. **Navigation** : Configuration et exécution de parcours autonomes
 
-arret_robot.sh
+## 🔧 Services
 
+Le système comprend plusieurs services pour faciliter les opérations :
 
-map_saver_service.py
+### `map_saver_service.py`
+Sauvegarde automatique des cartes avec horodatage et correction des chemins.
 
+### `navigation_service.py`
+Gestion des opérations de navigation autonome, avec démarrage/arrêt automatisés.
 
-navigation_service.py
+### Scripts d'automatisation
+- `en_lancer_robot_sur_turtlebot.sh` : Script de démarrage sur le robot
+- `en_lancer_robot_sur_pc_distant.sh` : Script de démarrage sur le PC de contrôle
+- `arret_robot.sh` : Arrêt propre de tous les services ROS
 
+## ⚠️ Dépannage
 
-correction-fichier.sh
+### Problèmes de connexion WebSocket
+Vérifiez que rosbridge est correctement lancé :
+```bash
+roslaunch rosbridge_server rosbridge_websocket.launch
+```
 
+### Erreurs de sauvegarde de carte
+Assurez-vous que le répertoire `~/maps` existe et que l'utilisateur courant a les droits d'écriture.
 
-Fichiers HTML : index.html, controle.html, cartographie.html, navigation.html
+### Navigation non fonctionnelle
+- Vérifiez que la carte est correctement chargée
+- Assurez-vous que la position initiale du robot est définie
+- Vérifiez les logs ROS avec `roslaunch --screen`
 
+## 👥 Contribution
 
-Rendez les scripts exécutables :
- chmod +x en_lancer_robot_sur_pc_distant.sh arret_robot.sh map_saver_service.py navigation_service.py correction-fichier.sh
+Les contributions sont les bienvenues ! N'hésitez pas à :
 
-Créez un serveur web local :
- sudo apt install python3-http.server
+1. Fork le projet
+2. Créer une branche pour votre fonctionnalité (`git checkout -b feature/amazing-feature`)
+3. Commit vos changements (`git commit -m 'Add some amazing feature'`)
+4. Push sur la branche (`git push origin feature/amazing-feature`)
+5. Ouvrir une Pull Request
 
+## 📄 Licence
 
-cd ~/chemin/vers/dossier/contenant/fichiers_html
-python3 -m http.server 8080
+Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus d'informations.
 
+## 📞 Contact
 
+Nadine ATCHA - Développeuse et responsable du projet
 
-3. Fonctionnalités principales
-3.1 Contrôle à distance
-L'interface web permet de piloter manuellement le TurtleBot3 avec des boutons intuitifs pour avancer, reculer, tourner et arrêter le robot.
-3.2 Cartographie
-Le mode cartographie permet de générer une carte de l'environnement en utilisant SLAM (Simultaneous Localization and Mapping). Les cartes peuvent être sauvegardées pour une utilisation ultérieure.
-3.3 Navigation autonome
-Le robot peut naviguer de manière autonome en suivant un itinéraire défini par des points de passage.
-
-4. Guide d'utilisation détaillé
-4.1 Démarrage du système
-Allumez le TurtleBot 3.
-Sur le PC distant, exécutez :
- ./en_lancer_robot_sur_pc_distant.sh
-
-Ouvrez l'interface web : http://localhost:8080
-
-
-4.2 Interface de contrôle manuel
-Flèche haut : avancer
-
-
-Flèche bas : reculer
-
-
-Flèche gauche/droite : tourner
-
-
-Bouton central : arrêter
-
-
-4.3 Création et sauvegarde d'une carte
-Démarrez SLAM.
-
-
-Déplacez le robot pour générer la carte.
-
-
-Sauvegardez la carte dans ~/maps/.
-
-
-4.4 Configuration et exécution d'un parcours autonome
-Ajoutez des points de passage.
-
-
-Démarrez le parcours.
-
-
-Suivez la progression du robot sur la carte.
-
-
-
-5. Résolution de problèmes
-Problème
-Solution
-Connexion perdue
-Vérifiez l'adresse IP et le réseau. Redémarrez le service.
-Carte non affichée
-Vérifiez que SLAM est activé et déplacez le robot.
-Navigation erronée
-Ajustez les points de passage et assurez-vous que la carte est précise.
-Arrêt d'urgence
-Utilisez le bouton d'arrêt ou ./arret_robot.sh.
-
-
-
-
-6. Informations techniques
-Structure des répertoires :
-
-
-Interface web : fichiers HTML/CSS/JS
-
-
-Cartes : stockées dans ~/maps/
-
-
-Services : gestion de la navigation et cartographie
-
-
-Technologies utilisées :
-
-
-ROS Noetic
-
-
-SLAM
-
-
-WebSockets
-
-
-HTML/CSS/JavaScript
-
-
-Arrêt propre du système :
-
-
- ./arret_robot.sh
-
-
+Développé avec ❤️ pour simplifier l'utilisation des robots TurtleBot3.
